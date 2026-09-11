@@ -65,53 +65,60 @@ class ThemeController extends ChangeNotifier {
 }
 
 // =========================================================================
-// DEFINISI PALET WARNA & THEMEDATA RESMI NARA (EARTH TONE & MIDNIGHT FOREST)
+// DEFINISI PALET WARNA & THEMEDATA RESMI NARA (SCREENSHOT STYLE)
 // =========================================================================
 
 class AppTheme {
-  // Palet Light Mode (Fresh Pine & Sandstone Emerald)
-  static const Color lightBg = Color(0xFFF4F7F5); // Fresh Crisp Off-White/Sage
-  static const Color lightCard = Color(0xFFFFFFFF); // Pure White Card
-  static const Color lightSurface = Color(0xFFE8EFEA); // Soft Forest Tint
-  static const Color lightSurfaceHigh = Color(0xFFDCE6DF); // Elevated Mist
-  static const Color lightPrimary = Color(0xFF2D5A43); // Deep Forest Emerald (Warna Awal Login)
-  static const Color lightPrimaryFixed = Color(0xFFCFE3D5); // Soft Sage Meadow
-  static const Color lightTextDark = Color(0xFF1A241F); // Deep Obsidian Green-Black
-  static const Color lightTextSecondary = Color(0xFF6B7D72); // Slate Forest Lichen
-  static const Color lightBorder = Color(0xFFD3E0D8); // Muted Sage Border
+  // Palet Light Mode
+  static const Color lightBg = Color(0xFFF0F4F1);
+  static const Color lightCard = Color(0xFFFFFFFF);
+  static const Color lightSurface = Color(0xFFEAF1EC);
+  static const Color lightSurfaceHigh = Color(0xFFDCE8DF);
+  static const Color lightPrimary = Color(0xFF2E7D46);     // Vivid Forest Green
+  static const Color lightPrimaryFixed = Color(0xFFCBE8D5);
+  static const Color lightTextDark = Color(0xFF1A241F);
+  static const Color lightTextSecondary = Color(0xFF6B7D72);
+  static const Color lightBorder = Color(0xFFD0DDD4);
 
-  // Palet Dark Mode (Deep Forest Obsidian & Luminous Emerald Sage)
-  static const Color darkBg = Color(0xFF0D1612); // Deep Forest Night
-  static const Color darkCard = Color(0xFF14241C); // Frosted Forest Card (Warna Awal Login)
-  static const Color darkSurface = Color(0xFF1B2E25); // Deep Woodland Surface
-  static const Color darkSurfaceHigh = Color(0xFF243B30); // Elevated Forest Earth
-  static const Color darkPrimary = Color(0xFF4CAF78); // Luminous Emerald Sage (Warna Awal Login)
-  static const Color darkPrimaryFixed = Color(0xFF1A382A); // Deep Pine Bed
-  static const Color darkTextLight = Color(0xFFF0F5F2); // Crisp Snow-White
-  static const Color darkTextSecondary = Color(0xFF95A69B); // Muted Mist Lichen
-  static const Color darkBorder = Color(0xFF233B2F); // Deep Earth Stone Border
+  // Palet Dark Mode
+  static const Color darkBg = Color(0xFF0D1612);
+  static const Color darkCard = Color(0xFF14241C);
+  static const Color darkSurface = Color(0xFF1B2E25);
+  static const Color darkSurfaceHigh = Color(0xFF243B30);
+  static const Color darkPrimary = Color(0xFF3DAF68);      // Bright Emerald
+  static const Color darkPrimaryFixed = Color(0xFF1A382A);
+  static const Color darkTextLight = Color(0xFFF0F5F2);
+  static const Color darkTextSecondary = Color(0xFF95A69B);
+  static const Color darkBorder = Color(0xFF233B2F);
 
-  // Aksen Earth Tone & Alam Bersama
-  static const Color goldAccent = Color(0xFFDDA15E); // Warm Sand Gold
-  static const Color goldAccentDark = Color(0xFFE9C46A); // Luminous Amber Gold
-  static const Color terracotta = Color(0xFFC46849); // Rustic Terracotta Clay
-  static const Color terracottaSoft = Color(0xFFE28C72); // Soft Desert Terracotta
-  static const Color roseAccent = Color(0xFFB8786B); // Earthy Dusty Rose Clay
-  static const Color earthBrown = Color(0xFF734E35); // Cedar Bark Brown
-  static const Color earthOlive = Color(0xFF586E53); // Olive Forest Green
-  static const Color errorRed = Color(0xFFD94A3D); // Warm Burnt Crimson
+  // Aksen Warna Cerah (Screenshot Style)
+  static const Color primaryGreen = Color(0xFF2E7D46);
+  static const Color primaryGreenDark = Color(0xFF3DAF68);
+  static const Color orangeAccent = Color(0xFFF4622A);     // Vivid Orange (Gear)
+  static const Color tealDark = Color(0xFF1B6B5C);         // Deep Teal (Maintenance)
+  static const Color tealDarkBright = Color(0xFF2DAA8F);   // Bright Teal (dark mode)
+  static const Color goldAccent = Color(0xFFE9A000);
+  static const Color goldAccentDark = Color(0xFFF5C842);
+  static const Color terracotta = Color(0xFFC46849);
+  static const Color terracottaSoft = Color(0xFFE28C72);
+  static const Color roseAccent = Color(0xFFB8786B);
+  static const Color earthBrown = Color(0xFF734E35);
+  static const Color earthOlive = Color(0xFF586E53);
+  static const Color errorRed = Color(0xFFD94A3D);
+  static const Color expeditionDarkBg = Color(0xFF1A3C2A);
 
-  /// Tema Terang (Light Earth Tone Theme)
+  /// Tema Terang
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: lightBg,
-      primaryColor: lightPrimary,
+      primaryColor: primaryGreen,
       colorScheme: const ColorScheme.light(
-        primary: lightPrimary,
-        secondary: goldAccent,
-        surface: lightCard,
+        primary: primaryGreen,
+        secondary: orangeAccent,
+        tertiary: tealDark,
+        surface: Colors.white,
         surfaceContainer: lightSurface,
         surfaceContainerHigh: lightSurfaceHigh,
         onPrimary: Colors.white,
@@ -123,16 +130,17 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: lightPrimary),
+        iconTheme: IconThemeData(color: lightTextDark),
         titleTextStyle: TextStyle(
-          color: lightPrimary,
-          fontSize: 20,
+          color: lightTextDark,
+          fontSize: 22,
           fontWeight: FontWeight.w900,
           fontFamily: 'Inter',
+          letterSpacing: 1.5,
         ),
       ),
       cardTheme: CardThemeData(
-        color: lightCard,
+        color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
@@ -140,15 +148,12 @@ class AppTheme {
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: lightCard,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      dividerTheme: const DividerThemeData(
-        color: lightBorder,
-        thickness: 1,
-      ),
+      dividerTheme: const DividerThemeData(color: lightBorder, thickness: 1),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: lightCard,
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -157,16 +162,17 @@ class AppTheme {
     );
   }
 
-  /// Tema Gelap (Dark Midnight Forest Theme)
+  /// Tema Gelap
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBg,
-      primaryColor: darkPrimary,
+      primaryColor: primaryGreenDark,
       colorScheme: const ColorScheme.dark(
-        primary: darkPrimary,
-        secondary: goldAccentDark,
+        primary: primaryGreenDark,
+        secondary: orangeAccent,
+        tertiary: tealDarkBright,
         surface: darkCard,
         surfaceContainer: darkSurface,
         surfaceContainerHigh: darkSurfaceHigh,
@@ -179,12 +185,13 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: darkPrimary),
+        iconTheme: IconThemeData(color: darkTextLight),
         titleTextStyle: TextStyle(
           color: darkTextLight,
-          fontSize: 20,
+          fontSize: 22,
           fontWeight: FontWeight.w900,
           fontFamily: 'Inter',
+          letterSpacing: 1.5,
         ),
       ),
       cardTheme: CardThemeData(
@@ -199,10 +206,7 @@ class AppTheme {
         backgroundColor: darkCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      dividerTheme: const DividerThemeData(
-        color: darkBorder,
-        thickness: 1,
-      ),
+      dividerTheme: const DividerThemeData(color: darkBorder, thickness: 1),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: darkCard,
         surfaceTintColor: Colors.transparent,
@@ -224,11 +228,11 @@ extension ThemeContextExtension on BuildContext {
     return theme.brightness == Brightness.dark;
   }
 
-  Color get themeBg => isDarkMode ? AppTheme.darkBg : AppTheme.lightBg;
-  Color get themeCard => isDarkMode ? AppTheme.darkCard : AppTheme.lightCard;
+  Color get themeBg => isDarkMode ? AppTheme.darkBg : const Color(0xFFF0F4F1);
+  Color get themeCard => isDarkMode ? AppTheme.darkCard : Colors.white;
   Color get themeSurface => isDarkMode ? AppTheme.darkSurface : AppTheme.lightSurface;
   Color get themeSurfaceHigh => isDarkMode ? AppTheme.darkSurfaceHigh : AppTheme.lightSurfaceHigh;
-  Color get themePrimary => isDarkMode ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+  Color get themePrimary => isDarkMode ? AppTheme.primaryGreenDark : AppTheme.primaryGreen;
   Color get themePrimaryFixed => isDarkMode ? AppTheme.darkPrimaryFixed : AppTheme.lightPrimaryFixed;
   Color get themeText => isDarkMode ? AppTheme.darkTextLight : AppTheme.lightTextDark;
   Color get themeTextSecondary => isDarkMode ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
@@ -237,4 +241,7 @@ extension ThemeContextExtension on BuildContext {
   Color get themeTerracotta => isDarkMode ? AppTheme.terracottaSoft : AppTheme.terracotta;
   Color get themeOlive => AppTheme.earthOlive;
   Color get themeBrown => AppTheme.earthBrown;
+  Color get themeOrange => AppTheme.orangeAccent;
+  Color get themeTeal => isDarkMode ? AppTheme.tealDarkBright : AppTheme.tealDark;
 }
+

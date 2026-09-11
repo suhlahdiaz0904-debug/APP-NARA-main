@@ -24,84 +24,7 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
   static const Color readyGreen = Color(0xFF386641); // Forest Moss Green
 
   late GearManager _gearManager;
-  String _selectedGearFilter = 'Semua';
-
-  final List<Map<String, dynamic>> _gearFilterCategories = [
-    {
-      'name': 'Semua',
-      'label': 'Semua Gear',
-      'icon': Icons.auto_awesome_rounded,
-      'gradient': [Color(0xFF143023), Color(0xFF2E7D32)],
-      'accentColor': Color(0xFF4CAF78),
-      'unselectedBg': Color(0xFFE8F5E9),
-      'unselectedIcon': Color(0xFF2E7D32),
-    },
-    {
-      'name': 'Tebing',
-      'label': 'Panjat Tebing',
-      'icon': Icons.terrain_rounded,
-      'gradient': [Color(0xFFD84315), Color(0xFFFF6E40)],
-      'accentColor': Color(0xFFFFAB91),
-      'unselectedBg': Color(0xFFFBE9E7),
-      'unselectedIcon': Color(0xFFD84315),
-    },
-    {
-      'name': 'Goa',
-      'label': 'Susur Goa',
-      'icon': Icons.dark_mode_rounded,
-      'gradient': [Color(0xFF4527A0), Color(0xFF7C4DFF)],
-      'accentColor': Color(0xFFB388FF),
-      'unselectedBg': Color(0xFFEDE7F6),
-      'unselectedIcon': Color(0xFF512DA8),
-    },
-    {
-      'name': 'Perawatan',
-      'label': 'Panduan Perawatan',
-      'icon': Icons.menu_book_rounded,
-      'gradient': [Color(0xFF00695C), Color(0xFF00BFA5)],
-      'accentColor': Color(0xFFA7FFEB),
-      'unselectedBg': Color(0xFFE0F2F1),
-      'unselectedIcon': Color(0xFF00796B),
-    },
-    {
-      'name': 'Pakaian',
-      'label': 'Rekomendasi Pakaian',
-      'icon': Icons.checkroom_rounded,
-      'gradient': [Color(0xFF0277BD), Color(0xFF00B0FF)],
-      'accentColor': Color(0xFF80D8FF),
-      'unselectedBg': Color(0xFFE1F5FE),
-      'unselectedIcon': Color(0xFF0288D1),
-    },
-  ];
-
-  List<GearCategory> get _filteredCategories {
-    if (_selectedGearFilter == 'Semua' ||
-        _selectedGearFilter == 'Perawatan' ||
-        _selectedGearFilter == 'Pakaian') {
-      return _gearManager.categories;
-    }
-    if (_selectedGearFilter == 'Tebing') {
-      return _gearManager.categories.where((cat) {
-        final title = cat.title.toLowerCase();
-        return title.contains('tebing') ||
-            title.contains('panjat') ||
-            title.contains('climb') ||
-            title.contains('umum') ||
-            title.contains('dasar');
-      }).toList();
-    }
-    if (_selectedGearFilter == 'Goa') {
-      return _gearManager.categories.where((cat) {
-        final title = cat.title.toLowerCase();
-        return title.contains('goa') ||
-            title.contains('caving') ||
-            title.contains('karst') ||
-            title.contains('umum') ||
-            title.contains('dasar');
-      }).toList();
-    }
-    return _gearManager.categories;
-  }
+  List<GearCategory> get _filteredCategories => _gearManager.categories;
 
   @override
   void initState() {
@@ -639,10 +562,7 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
 
                   // Indikator Sinkronisasi Firebase Cloud
                   _buildCloudSyncBanner(),
-
-                  // Filter Kategori Berwarna
-                  _buildGearFilterChips(),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 12),
 
                 // 1. Status Pill Dinamis (X / Y Siap)
                 _buildStatusSummaryCard(),
@@ -718,126 +638,6 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
   );
 }
 
-  Widget _buildGearFilterChips() {
-    final bool isDark = context.isDarkMode;
-
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _gearFilterCategories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = _gearFilterCategories[index];
-          final String name = cat['name'] as String;
-          final String label = cat['label'] as String;
-          final IconData icon = cat['icon'] as IconData;
-          final List<Color> gradient = cat['gradient'] as List<Color>;
-          final Color accentColor = cat['accentColor'] as Color;
-          final Color unselectedBg = cat['unselectedBg'] as Color;
-          final Color unselectedIcon = cat['unselectedIcon'] as Color;
-          final bool isSelected = _selectedGearFilter == name;
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedGearFilter = name;
-              });
-              if (name == 'Perawatan') {
-                _navigateToCareGuide();
-              } else if (name == 'Pakaian') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RekomendasiPakaianPage(),
-                  ),
-                );
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? LinearGradient(
-                        colors: gradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isSelected
-                    ? null
-                    : (isDark
-                        ? context.themeSurface
-                        : unselectedBg.withValues(alpha: 0.85)),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isSelected
-                      ? accentColor.withValues(alpha: 0.7)
-                      : (isDark
-                          ? Colors.white.withValues(alpha: 0.12)
-                          : unselectedIcon.withValues(alpha: 0.3)),
-                  width: isSelected ? 1.5 : 1.0,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: gradient.last.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white.withValues(alpha: 0.25)
-                          : (isDark
-                              ? unselectedIcon.withValues(alpha: 0.25)
-                              : Colors.white),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 14,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? accentColor : unselectedIcon),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? context.themeText : const Color(0xFF1E293B)),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 
   // Card Ringkasan Status
   Widget _buildStatusSummaryCard() {

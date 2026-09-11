@@ -49,60 +49,10 @@ class _KeamananPageState extends State<KeamananPage>
   String _elevationText = '450 m ASL';
 
   Timer? _clockTimer;
-  String _selectedSafetyFilter = 'Semua';
-
   // Firebase Streams & State
   StreamSubscription? _sosAlertsSubscription;
   StreamSubscription? _liveTrackersSubscription;
   final List<Map<String, dynamic>> _remoteSosAlerts = [];
-
-  final List<Map<String, dynamic>> _safetyFilterCategories = [
-    {
-      'name': 'Semua',
-      'label': 'Semua Fitur',
-      'icon': Icons.auto_awesome_rounded,
-      'gradient': [Color(0xFF143023), Color(0xFF2E7D32)],
-      'accentColor': Color(0xFF4CAF78),
-      'unselectedBg': Color(0xFFE8F5E9),
-      'unselectedIcon': Color(0xFF2E7D32),
-    },
-    {
-      'name': 'SOS',
-      'label': 'Tombol Darurat SOS',
-      'icon': Icons.sos_rounded,
-      'gradient': [Color(0xFFB71C1C), Color(0xFFE53935)],
-      'accentColor': Color(0xFFFF8A80),
-      'unselectedBg': Color(0xFFFFEBEE),
-      'unselectedIcon': Color(0xFFD32F2F),
-    },
-    {
-      'name': 'Wanita',
-      'label': 'Kebutuhan Wanita',
-      'icon': Icons.female_rounded,
-      'gradient': [Color(0xFF880E4F), Color(0xFFE91E63)],
-      'accentColor': Color(0xFFFF80AB),
-      'unselectedBg': Color(0xFFFCE4EC),
-      'unselectedIcon': Color(0xFFC2185B),
-    },
-    {
-      'name': 'Satelit',
-      'label': 'Satelit & GPS',
-      'icon': Icons.satellite_alt_rounded,
-      'gradient': [Color(0xFF0D47A1), Color(0xFF1E88E5)],
-      'accentColor': Color(0xFF82B1FF),
-      'unselectedBg': Color(0xFFE3F2FD),
-      'unselectedIcon': Color(0xFF1976D2),
-    },
-    {
-      'name': 'Evakuasi',
-      'label': 'Protokol Evakuasi',
-      'icon': Icons.medical_services_rounded,
-      'gradient': [Color(0xFFE65100), Color(0xFFFF9800)],
-      'accentColor': Color(0xFFFFAB91),
-      'unselectedBg': Color(0xFFFBE9E7),
-      'unselectedIcon': Color(0xFFD84315),
-    },
-  ];
 
   // Data Teman Luring (Offline Mesh Tracker) berasal dari Firebase Firestore & SQLite
   final List<Map<String, dynamic>> _offlinePeers = [];
@@ -864,9 +814,6 @@ class _KeamananPageState extends State<KeamananPage>
                   ),
                   const SizedBox(height: 16),
 
-                  // Filter Fitur Keamanan Berwarna
-                  _buildSafetyFilterChips(),
-                  const SizedBox(height: 18),
 
                   // =================================================================
                   // NOTIFIKASI DARURAT SOS MASUK (DARI REKAN TIM DI FIRESTORE)
@@ -1497,128 +1444,5 @@ class _KeamananPageState extends State<KeamananPage>
     );
   }
 
-  Widget _buildSafetyFilterChips() {
-    final bool isDark = context.isDarkMode;
 
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _safetyFilterCategories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = _safetyFilterCategories[index];
-          final String name = cat['name'] as String;
-          final String label = cat['label'] as String;
-          final IconData icon = cat['icon'] as IconData;
-          final List<Color> gradient = cat['gradient'] as List<Color>;
-          final Color accentColor = cat['accentColor'] as Color;
-          final Color unselectedBg = cat['unselectedBg'] as Color;
-          final Color unselectedIcon = cat['unselectedIcon'] as Color;
-          final bool isSelected = _selectedSafetyFilter == name;
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedSafetyFilter = name;
-              });
-              if (name == 'Wanita') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const KebutuhanWanitaPage(),
-                  ),
-                );
-              } else if (name == 'Evakuasi') {
-                _showProtokolKritisSheet();
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? LinearGradient(
-                        colors: gradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isSelected
-                    ? null
-                    : (isDark
-                          ? context.themeSurface
-                          : unselectedBg.withValues(alpha: 0.85)),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isSelected
-                      ? accentColor.withValues(alpha: 0.7)
-                      : (isDark
-                            ? Colors.white.withValues(alpha: 0.12)
-                            : unselectedIcon.withValues(alpha: 0.3)),
-                  width: isSelected ? 1.5 : 1.0,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: gradient.last.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white.withValues(alpha: 0.25)
-                          : (isDark
-                                ? unselectedIcon.withValues(alpha: 0.25)
-                                : Colors.white),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 14,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? accentColor : unselectedIcon),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: isSelected
-                          ? FontWeight.w800
-                          : FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark
-                                ? context.themeText
-                                : const Color(0xFF1E293B)),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 }
