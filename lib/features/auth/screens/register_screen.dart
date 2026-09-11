@@ -4,6 +4,8 @@ import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/features/auth/screens/login_screen.dart';
 import 'package:flutter_application_1/features/home/screens/home_screen.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
+import 'package:flutter_application_1/core/services/auth_service.dart';
+import 'package:flutter_application_1/core/widgets/google_sign_in_button.dart';
 import 'package:flutter_application_1/features/auth/models/user_model.dart';
 import 'package:flutter_application_1/features/profile/screens/privacy_policy_screen.dart';
 
@@ -25,41 +27,33 @@ class _Tugas12RegisterPageState extends State<Tugas12RegisterPage> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
+      final nama = _namaCtrl.text.trim();
       final email = _emailCtrl.text.trim();
-      final existingUser = await DatabaseHelper.instance.getUserByEmail(email);
-      if (existingUser != null) {
-        setState(() => _isLoading = false);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email ini sudah terdaftar! Silakan langsung Masuk.'),
-            backgroundColor: AppTheme.errorRed,
-          ),
-        );
-        return;
-      }
-
-      final newUser = UserModel(
-        nama: _namaCtrl.text.trim(),
-        email: email,
-        noHp: _noHpCtrl.text.trim(),
-        password: _passwordCtrl.text,
-        asalKota: _asalKotaCtrl.text.trim(),
-      );
+      final noHp = _noHpCtrl.text.trim();
+      final password = _passwordCtrl.text;
+      final asalKota = _asalKotaCtrl.text.trim();
 
       try {
-        await DatabaseHelper.instance.registerUser(newUser);
+        await AuthService.instance.registerWithEmailPassword(
+          nama: nama,
+          email: email,
+          password: password,
+          noHp: noHp,
+          asalKota: asalKota.isNotEmpty ? asalKota : 'Indonesia',
+        );
+
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Akun Berhasil Dibuat! Selamat Datang di NARA, ${newUser.nama}!',
+              'Akun Berhasil Dibuat di Firebase & Tersinkron! Selamat Datang, $nama!',
             ),
             backgroundColor: const Color(0xFF2D5A43),
           ),
@@ -73,17 +67,86 @@ class _Tugas12RegisterPageState extends State<Tugas12RegisterPage> {
         );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Gagal Mendaftar: Terjadi kesalahan saat menyimpan ke database!',
+        String errorMessage = 'Gagal Mendaftar: Terjadi kesalahan.';
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('email-already-in-use') || errStr.contains('already registered')) {
+          errorMessage = 'Email ini sudah terdaftar di Firebase/NARA! Silakan langsung Masuk.';
+        } else if (errStr.contains('weak-password')) {
+          errorMessage = 'Kata sandi terlalu lemah. Gunakan minimal 6 karakter.';
+        } else if (errStr.contains('invalid-email')) {
+          errorMessage = 'Format email tidak valid!';
+        } else if (errStr.contains('network-request-failed')) {
+          // Fallback ke pendaftaran offline SQLite lokal
+          final newUser = UserModel(
+            nama: nama,
+            email: email,
+            noHp: noHp,
+            password: password,
+            asalKota: asalKota.isNotEmpty ? asalKota : 'Indonesia',
+          );
+          final id = await DatabaseHelper.instance.registerUser(newUser);
+          await DatabaseHelper.instance.setActiveUserId(id);
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Tersimpan di Mode Offline. Selamat Datang, $nama!'),
+              backgroundColor: const Color(0xFF2D5A43),
             ),
+          );
+          await Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const NaraApp()),
+            (route) => false,
+          );
+          return;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
             backgroundColor: AppTheme.errorRed,
           ),
         );
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
+    }
+  }
+
+  void _handleGoogleSignIn() async {
+    setState(() => _isGoogleLoading = true);
+    try {
+      final userCredential = await AuthService.instance.signInWithGoogle();
+      if (!mounted) return;
+
+      if (userCredential != null) {
+        final displayName =
+            userCredential.user?.displayName ?? 'Petualang NARA';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selamat Datang di NARA, $displayName!'),
+            backgroundColor: const Color(0xFF2D5A43),
+          ),
+        );
+
+        // Arahkan langsung ke Home Page NARA
+        await Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const NaraApp()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal Mendaftar dengan Google: ${e.toString()}'),
+          backgroundColor: AppTheme.errorRed,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -215,9 +278,13 @@ class _Tugas12RegisterPageState extends State<Tugas12RegisterPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildHeader(),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
+                      _buildGoogleSignInBar(),
+                      const SizedBox(height: 18),
+                      _buildDividerWithText('ATAU DAFTAR DENGAN EMAIL'),
+                      const SizedBox(height: 18),
                       _buildFormFields(),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       _buildSubmitButton(),
                       const SizedBox(height: 14),
                       _buildPrivacyPolicyNotice(),
@@ -231,6 +298,45 @@ class _Tugas12RegisterPageState extends State<Tugas12RegisterPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildGoogleSignInBar() {
+    return GoogleSignInButton(
+      label: 'Daftar dengan Google',
+      isLoading: _isGoogleLoading,
+      onPressed: _isLoading || _isGoogleLoading ? null : _handleGoogleSignIn,
+    );
+  }
+
+  Widget _buildDividerWithText(String text) {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(
+            color: Colors.white.withValues(alpha: 0.22),
+            thickness: 0.8,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            text,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(
+            color: Colors.white.withValues(alpha: 0.22),
+            thickness: 0.8,
+          ),
+        ),
+      ],
     );
   }
 
@@ -330,7 +436,7 @@ class _Tugas12RegisterPageState extends State<Tugas12RegisterPage> {
     return SizedBox(
       height: 52,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleRegister,
+        onPressed: _isLoading || _isGoogleLoading ? null : _handleRegister,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF2D5A43),
           foregroundColor: Colors.white,

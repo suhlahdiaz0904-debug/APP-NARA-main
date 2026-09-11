@@ -4,10 +4,11 @@ import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/features/profile/screens/expedition_log_detail_screen.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:flutter_application_1/features/profile/models/expedition_log_model.dart';
+import 'package:flutter_application_1/core/services/expedition_firestore_service.dart';
 
 // =========================================================================
 // HALAMAN DAFTAR RIWAYAT LOG EKSPEDISI PETUALANG NARA (DARK & LIGHT EARTH TONE)
-// Menampilkan seluruh ekspedisi yang telah selesai & tersinkronisasi SQLite
+// Menampilkan seluruh ekspedisi yang telah selesai & tersinkronisasi SQLite & Cloud Firestore
 // =========================================================================
 
 class RiwayatLogPage extends StatefulWidget {
@@ -21,6 +22,7 @@ class RiwayatLogPage extends StatefulWidget {
 class _RiwayatLogPageState extends State<RiwayatLogPage> {
   List<ExpeditionLog> _logs = [];
   bool _isLoading = true;
+  bool _isSyncingCloud = false;
   String _selectedFilter = 'Semua';
 
   final List<String> _filters = ['Semua', 'Tebing', 'Goa'];
@@ -39,6 +41,63 @@ class _RiwayatLogPageState extends State<RiwayatLogPage> {
         _logs = results;
         _isLoading = false;
       });
+    }
+    // Lakukan sinkronisasi cloud di latar belakang
+    _syncCloudSilent();
+  }
+
+  Future<void> _syncCloudSilent() async {
+    if (_isSyncingCloud) return;
+    try {
+      final syncedLogs = await ExpeditionFirestoreService.instance.syncLocalAndCloudLogs(
+        localUserId: widget.userId,
+      );
+      if (mounted && syncedLogs.isNotEmpty) {
+        setState(() {
+          _logs = syncedLogs;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _syncWithCloudManual() async {
+    setState(() => _isSyncingCloud = true);
+    try {
+      final syncedLogs = await ExpeditionFirestoreService.instance.syncLocalAndCloudLogs(
+        localUserId: widget.userId,
+      );
+      if (mounted) {
+        setState(() {
+          _logs = syncedLogs;
+          _isSyncingCloud = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.cloud_done_rounded, color: Color(0xFF4CAF50), size: 20),
+                const SizedBox(width: 8),
+                Text('Tersinkron dengan Cloud Firestore (${_logs.length} log)'),
+              ],
+            ),
+            backgroundColor: const Color(0xFF1E382B),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSyncingCloud = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal sinkronisasi dengan Cloud.'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -94,9 +153,18 @@ class _RiwayatLogPageState extends State<RiwayatLogPage> {
                 onPressed: () => ThemeController.instance.toggleTheme(context),
               ),
               IconButton(
-                icon: Icon(Icons.refresh_rounded, color: context.themePrimary),
-                tooltip: 'Muat Ulang',
-                onPressed: _loadLogs,
+                icon: _isSyncingCloud
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.themePrimary,
+                        ),
+                      )
+                    : Icon(Icons.cloud_sync_rounded, color: context.themePrimary),
+                tooltip: 'Sinkronisasi Cloud Firestore',
+                onPressed: _syncWithCloudManual,
               ),
               const SizedBox(width: 4),
             ],

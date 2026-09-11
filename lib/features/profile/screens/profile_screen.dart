@@ -13,6 +13,7 @@ import 'package:flutter_application_1/features/map/screens/bookmark_list_screen.
 import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:flutter_application_1/features/auth/models/user_model.dart';
 import 'package:flutter_application_1/features/profile/screens/privacy_policy_screen.dart';
+import 'package:flutter_application_1/core/services/auth_service.dart';
 
 // =========================================================================
 // HALAMAN PROFIL PENGGUNA NARA (1:1 DENGAN DESAIN GOOGLE STITCH)
@@ -153,6 +154,9 @@ class _ProfilePageState extends State<ProfilePage> {
         await DatabaseHelper.instance.updateUser(updated);
         final freshUser = await DatabaseHelper.instance.getLatestUser();
 
+        // Sinkronisasi otomatis foto & profil ke Cloud Firestore
+        AuthService.instance.syncUserProfileToFirestore(freshUser ?? updated);
+
         if (mounted) {
           setState(() {
             _currentUser = freshUser ?? updated;
@@ -160,7 +164,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Foto Profil berhasil diperbarui dan tersinkronisasi!'),
+              content: Text('Foto Profil berhasil diperbarui dan tersinkronisasi ke Cloud!'),
               backgroundColor: Color(0xFF2E7D32),
               duration: Duration(seconds: 2),
             ),
@@ -1524,8 +1528,10 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Text('Batal', style: TextStyle(color: context.themeTextSecondary)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              await AuthService.instance.signOut();
+              if (!mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(

@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_application_1/core/services/auth_service.dart';
 
 class Tugas12ForgotPassword extends StatefulWidget {
   const Tugas12ForgotPassword({super.key});
@@ -24,22 +24,14 @@ class _Tugas12ForgotPasswordState extends State<Tugas12ForgotPassword> {
     final email = emailC.text.trim();
     setState(() => _isLoading = true);
 
-    // 2. Cek apakah email terdaftar di SQLite Database
-    final user = await DatabaseHelper.instance.getUserByEmail(email);
-    if (user == null) {
-      setState(() => _isLoading = false);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email belum terdaftar di database NARA! Silakan daftar akun terlebih dahulu.'),
-          backgroundColor: AppTheme.errorRed,
-        ),
-      );
-      return;
-    }
+    // 2. Kirim email reset password via Firebase Auth
+    try {
+      await AuthService.instance.sendPasswordResetEmail(email);
+    } catch (_) {}
 
-    final String userName =
-        user.nama.isNotEmpty ? user.nama : 'Petualang';
+    // 3. Cek apakah email terdaftar di SQLite Database
+    final user = await DatabaseHelper.instance.getUserByEmail(email);
+    final String userName = user?.nama.isNotEmpty == true ? user!.nama : 'Petualang';
     final int verificationCode = 100000 + Random().nextInt(900000);
 
     // 3. Format URL Mailto untuk membuka aplikasi email bawaan / perangkat

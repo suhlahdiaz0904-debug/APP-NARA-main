@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_application_1/firebase_options.dart';
 import 'package:flutter_application_1/core/theme/theme_provider.dart';
+import 'package:flutter_application_1/core/services/firebase_database_seeder.dart';
 import 'package:flutter_application_1/features/home/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await ThemeController.instance.init();
+  
+  // Seed data awal ke Firebase Firestore
+  FirebaseDatabaseSeeder.instance.seedInitialDataToFirestore();
+  
   runApp(const MyApp());
 }
 

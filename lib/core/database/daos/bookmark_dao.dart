@@ -1,8 +1,10 @@
 import 'package:flutter_application_1/core/database/tables/database_tables.dart';
+import 'package:flutter_application_1/core/services/bookmark_firestore_service.dart';
 import 'package:flutter_application_1/features/map/models/bookmark_model.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
-/// Data Access Object (DAO) for User Bookmarks and Favorited Cave Spots.
+/// Data Access Object (DAO) for User Bookmarks and Favorited Cave Spots
+/// with automatic background Cloud Firestore synchronization (`nara_user_bookmarks`).
 class BookmarkDao {
   final sqflite.Database Function() _getDb;
 
@@ -40,6 +42,10 @@ class BookmarkDao {
         where: '${BookmarkTable.columnUserId} = ? AND ${BookmarkTable.columnSpotId} = ?',
         whereArgs: [userId, spotId],
       );
+
+      // Sinkronisasi hapus ke Cloud Firestore
+      BookmarkFirestoreService.instance.removeBookmarkFromCloud(spotId);
+
       return false;
     } else {
       final newBookmark = BookmarkModel(
@@ -59,6 +65,10 @@ class BookmarkDao {
         newBookmark.toMap(),
         conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
       );
+
+      // Sinkronisasi simpan ke Cloud Firestore
+      BookmarkFirestoreService.instance.saveBookmarkToCloud(newBookmark);
+
       return true;
     }
   }
@@ -78,11 +88,16 @@ class BookmarkDao {
   /// Removes a bookmark record matching user ID and spot ID.
   Future<int> removeBookmark(int userId, String spotId) async {
     final db = _getDb();
-    return await db.delete(
+    final count = await db.delete(
       BookmarkTable.tableName,
       where: '${BookmarkTable.columnUserId} = ? AND ${BookmarkTable.columnSpotId} = ?',
       whereArgs: [userId, spotId],
     );
+
+    // Sinkronisasi hapus ke Cloud Firestore
+    BookmarkFirestoreService.instance.removeBookmarkFromCloud(spotId);
+
+    return count;
   }
 
   /// Directly inserts a bookmark record into SQLite.

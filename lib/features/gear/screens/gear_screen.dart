@@ -20,7 +20,6 @@ class PeriksaGearPage extends StatefulWidget {
 }
 
 class _PeriksaGearPageState extends State<PeriksaGearPage> {
-  static const Color darkGreen = Color(0xFF1E382B); // Deep Forest Moss
   static const Color alertRed = Color(0xFFD94A3D); // Warm Burnt Crimson
   static const Color readyGreen = Color(0xFF386641); // Forest Moss Green
 
@@ -188,13 +187,71 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          item.isReady
-              ? '${item.title} ditandai Siap!'
-              : '${item.title} perlu diperiksa kembali.',
+        content: Row(
+          children: [
+            Icon(
+              item.isReady ? Icons.cloud_done_rounded : Icons.info_outline_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                item.isReady
+                    ? '${item.title} Siap & Tersinkron ke Firebase Cloud!'
+                    : '${item.title} ditandai perlu diverifikasi.',
+              ),
+            ),
+          ],
         ),
         backgroundColor: item.isReady ? readyGreen : alertRed,
-        duration: const Duration(milliseconds: 900),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showDeleteGearDialog(GearItem item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.themeCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_outline_rounded, color: AppTheme.errorRed),
+            const SizedBox(width: 8),
+            Text('Hapus Alat?', style: TextStyle(color: context.themeText, fontSize: 16)),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus "${item.title}" dari inventaris dan Cloud Firestore?',
+          style: TextStyle(color: context.themeTextSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Batal', style: TextStyle(color: context.themeTextSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _gearManager.deleteGear(item.id);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Alat "${item.title}" berhasil dihapus dari Cloud Firestore.'),
+                  backgroundColor: AppTheme.errorRed,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorRed,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
       ),
     );
   }
@@ -211,13 +268,15 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
   void _showTambahAlatDialog() {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController noteController = TextEditingController();
-    String selectedCategory = _gearManager.categories.first.title;
+    String selectedCategory = _gearManager.categories.isNotEmpty
+        ? _gearManager.categories.first.title
+        : 'Tali & Keamanan';
     bool initialReadyStatus = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.themeCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -238,16 +297,22 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Tambah Alat Baru',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: darkGreen,
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.cloud_upload_rounded, color: Color(0xFF4CAF78), size: 22),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Tambah Alat ke Cloud',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: context.themeText,
+                            ),
+                          ),
+                        ],
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close_rounded),
+                        icon: Icon(Icons.close_rounded, color: context.themeTextSecondary),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
@@ -255,11 +320,12 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: nameController,
+                    style: TextStyle(color: context.themeText),
                     decoration: InputDecoration(
                       labelText: 'Nama Alat / Gear',
                       hintText: 'Contoh: Descender Petzl Simple',
                       filled: true,
-                      fillColor: const Color(0xFFF5F2EC),
+                      fillColor: context.themeSurface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -269,11 +335,12 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: noteController,
+                    style: TextStyle(color: context.themeText),
                     decoration: InputDecoration(
                       labelText: 'Keterangan / Catatan',
                       hintText: 'Contoh: Siap digunakan di goa vertikal',
                       filled: true,
-                      fillColor: const Color(0xFFF5F2EC),
+                      fillColor: context.themeSurface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -283,10 +350,11 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: selectedCategory,
+                    dropdownColor: context.themeCard,
                     decoration: InputDecoration(
                       labelText: 'Kategori Perlengkapan',
                       filled: true,
-                      fillColor: const Color(0xFFF5F2EC),
+                      fillColor: context.themeSurface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -295,7 +363,7 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                     items: _gearManager.categories.map((cat) {
                       return DropdownMenuItem<String>(
                         value: cat.title,
-                        child: Text(cat.title),
+                        child: Text(cat.title, style: TextStyle(color: context.themeText)),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -307,15 +375,16 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                   const SizedBox(height: 12),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
+                    title: Text(
                       'Tandai Langsung Siap Digunakan',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
+                        color: context.themeText,
                       ),
                     ),
                     value: initialReadyStatus,
-                    activeThumbColor: darkGreen,
+                    activeThumbColor: context.themePrimary,
                     onChanged: (val) {
                       setModalState(() => initialReadyStatus = val);
                     },
@@ -324,7 +393,8 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                   SizedBox(
                     width: double.infinity,
                     height: 50,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.cloud_upload_outlined, color: Colors.white, size: 20),
                       onPressed: () {
                         if (nameController.text.trim().isNotEmpty) {
                           _gearManager.addNewGear(
@@ -337,21 +407,22 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Alat "${nameController.text.trim()}" berhasil ditambahkan dan panduan perawatan otomatis disinkronkan!',
+                                'Alat "${nameController.text.trim()}" berhasil disimpan ke Firebase Cloud Firestore!',
                               ),
                               backgroundColor: readyGreen,
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: darkGreen,
+                        backgroundColor: context.themePrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text(
-                        'Simpan Alat',
+                      label: const Text(
+                        'Simpan ke Cloud',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 15,
@@ -369,6 +440,96 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
     );
   }
 
+  Widget _buildCloudSyncBanner() {
+    final bool isSyncing = _gearManager.isSyncing;
+    final String syncTime = _gearManager.lastSyncedAt != null
+        ? '${_gearManager.lastSyncedAt!.hour.toString().padLeft(2, '0')}:${_gearManager.lastSyncedAt!.minute.toString().padLeft(2, '0')}'
+        : 'Baru saja';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: context.themeSurfaceHigh,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.isDarkMode ? Colors.white12 : const Color(0xFFE0E5E0),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        children: [
+          if (isSyncing)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4CAF78)),
+              ),
+            )
+          else
+            const Icon(
+              Icons.cloud_done_rounded,
+              color: Color(0xFF4CAF78),
+              size: 20,
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isSyncing
+                      ? 'Menyinkronkan ke Cloud Firestore...'
+                      : 'Tersinkronisasi dengan Firebase Cloud',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: context.themeText,
+                  ),
+                ),
+                Text(
+                  isSyncing
+                      ? 'Memperbarui checklist alat...'
+                      : 'Sinkronisasi terakhir: $syncTime WIB',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: context.themeTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.refresh_rounded,
+              size: 18,
+              color: context.themePrimary,
+            ),
+            tooltip: 'Sinkronisasi Sekarang',
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: EdgeInsets.zero,
+            onPressed: isSyncing
+                ? null
+                : () async {
+                    await _gearManager.syncFromFirestore();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Inventaris alat berhasil diperbarui dari Firebase!'),
+                        backgroundColor: Color(0xFF2D5A43),
+                        behavior: SnackBarBehavior.floating,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final realtimeWeather = _getRealtimeWeather();
@@ -376,104 +537,112 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
 
     return Scaffold(
       backgroundColor: context.themeBg,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // Glassmorphism AppBar (Blur saat scroll)
-          if (widget.showAppBar)
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-              automaticallyImplyLeading: false,
-              leading: widget.showBackButton
-                  ? IconButton(
-                      icon: Icon(Icons.arrow_back, color: context.themePrimary),
-                      onPressed: () {
-                        if (Navigator.canPop(context)) {
-                          Navigator.pop(context);
-                        }
-                      },
-                    )
-                  : null,
-              title: Text(
-                'NARA',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: context.isDarkMode ? AppTheme.darkPrimary : const Color(0xFF143023),
-                ),
-              ),
-              centerTitle: true,
-              flexibleSpace: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                  child: Container(
-                    color: context.themeBg.withValues(alpha: 0.75),
-                  ),
-                ),
-              ),
-              actions: [
-                IconButton(
-                  icon: Icon(
-                    isDark
-                        ? Icons.light_mode_rounded
-                        : Icons.dark_mode_outlined,
-                    color: isDark
-                        ? AppTheme.goldAccentDark
-                        : context.themePrimary,
-                    size: 22,
-                  ),
-                  tooltip: isDark
-                      ? 'Beralih ke Mode Terang'
-                      : 'Beralih ke Mode Gelap',
-                  onPressed: () =>
-                      ThemeController.instance.toggleTheme(context),
-                ),
-                IconButton(
-                  tooltip: 'Panduan Perawatan',
-                  icon: Icon(
-                    Icons.menu_book_rounded,
-                    color: context.themePrimary,
-                  ),
-                  onPressed: () => _navigateToCareGuide(),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ),
-
-          // Konten Utama
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20.0,
-              vertical: 12.0,
-            ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Text(
-                  'Periksa Gear Kamu',
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _gearManager.syncFromFirestore();
+        },
+        color: context.themePrimary,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
+            // Glassmorphism AppBar (Blur saat scroll)
+            if (widget.showAppBar)
+              SliverAppBar(
+                pinned: true,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                automaticallyImplyLeading: false,
+                leading: widget.showBackButton
+                    ? IconButton(
+                        icon: Icon(Icons.arrow_back, color: context.themePrimary),
+                        onPressed: () {
+                          if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          }
+                        },
+                      )
+                    : null,
+                title: Text(
+                  'NARA',
                   style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: context.themeText,
+                    fontFamily: 'Inter',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: context.isDarkMode ? AppTheme.darkPrimary : const Color(0xFF143023),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Verifikasi kelayakan alat ekspedisi goa dan panjat tebing secara berkala.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.themeTextSecondary,
-                    height: 1.3,
+                centerTitle: true,
+                flexibleSpace: ClipRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      color: context.themeBg.withValues(alpha: 0.75),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                actions: [
+                  IconButton(
+                    icon: Icon(
+                      isDark
+                          ? Icons.light_mode_rounded
+                          : Icons.dark_mode_outlined,
+                      color: isDark
+                          ? AppTheme.goldAccentDark
+                          : context.themePrimary,
+                      size: 22,
+                    ),
+                    tooltip: isDark
+                        ? 'Beralih ke Mode Terang'
+                        : 'Beralih ke Mode Gelap',
+                    onPressed: () =>
+                        ThemeController.instance.toggleTheme(context),
+                  ),
+                  IconButton(
+                    tooltip: 'Panduan Perawatan',
+                    icon: Icon(
+                      Icons.menu_book_rounded,
+                      color: context.themePrimary,
+                    ),
+                    onPressed: () => _navigateToCareGuide(),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
 
-                // Filter Kategori Berwarna
-                _buildGearFilterChips(),
-                const SizedBox(height: 18),
+            // Konten Utama
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 12.0,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  Text(
+                    'Periksa Gear Kamu',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: context.themeText,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Verifikasi kelayakan alat ekspedisi goa dan panjat tebing secara berkala.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: context.themeTextSecondary,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Indikator Sinkronisasi Firebase Cloud
+                  _buildCloudSyncBanner(),
+
+                  // Filter Kategori Berwarna
+                  _buildGearFilterChips(),
+                  const SizedBox(height: 18),
 
                 // 1. Status Pill Dinamis (X / Y Siap)
                 _buildStatusSummaryCard(),
@@ -545,8 +714,9 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildGearFilterChips() {
     final bool isDark = context.isDarkMode;
@@ -1039,124 +1209,127 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
     required VoidCallback onActionTap,
     required VoidCallback onCareTap,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: context.themeCard,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              item.icon,
-              color: item.isReady ? context.themePrimary : context.themeText,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: GestureDetector(
-              onTap: onCareTap,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: context.themeText,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: item.isReady
-                          ? context.themeTextSecondary
-                          : AppTheme.errorRed,
-                      fontWeight: item.isReady
-                          ? FontWeight.normal
-                          : FontWeight.w500,
-                    ),
-                  ),
-                ],
+    return InkWell(
+      onLongPress: () => _showDeleteGearDialog(item),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: context.themeCard,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                item.icon,
+                color: item.isReady ? context.themePrimary : context.themeText,
+                size: 20,
               ),
             ),
-          ),
-          // Tombol Info Panduan Perawatan
-          IconButton(
-            tooltip: 'Panduan Perawatan',
-            icon: Icon(
-              Icons.menu_book_outlined,
-              size: 18,
-              color: context.themePrimary,
-            ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            onPressed: onCareTap,
-          ),
-          const SizedBox(width: 4),
-          if (item.isReady)
-            GestureDetector(
-              onTap: onActionTap,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: context.themePrimaryFixed,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: onCareTap,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.check_circle_rounded,
-                      color: context.themePrimary,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
                     Text(
-                      'Siap',
+                      item.title,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: context.themePrimary,
+                        color: context.themeText,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.subtitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: item.isReady
+                            ? context.themeTextSecondary
+                            : AppTheme.errorRed,
+                        fontWeight: item.isReady
+                            ? FontWeight.normal
+                            : FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
-            )
-          else
-            ElevatedButton(
-              onPressed: onActionTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.themePrimary,
-                foregroundColor: context.isDarkMode
-                    ? const Color(0xFF0F1713)
-                    : Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                minimumSize: const Size(60, 32),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Periksa',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-              ),
             ),
-        ],
+            // Tombol Info Panduan Perawatan
+            IconButton(
+              tooltip: 'Panduan Perawatan',
+              icon: Icon(
+                Icons.menu_book_outlined,
+                size: 18,
+                color: context.themePrimary,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: onCareTap,
+            ),
+            const SizedBox(width: 4),
+            if (item.isReady)
+              GestureDetector(
+                onTap: onActionTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.themePrimaryFixed,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: context.themePrimary,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Siap',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: context.themePrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ElevatedButton(
+                onPressed: onActionTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.themePrimary,
+                  foregroundColor: context.isDarkMode
+                      ? const Color(0xFF0F1713)
+                      : Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  minimumSize: const Size(60, 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Periksa',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

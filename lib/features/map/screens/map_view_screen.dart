@@ -1317,8 +1317,9 @@ class _PetaViewerPageState extends State<PetaViewerPage>
                       _currentMode = _currentMode == MapMode.measure
                           ? MapMode.normal
                           : MapMode.measure;
-                      if (_currentMode == MapMode.normal)
+                      if (_currentMode == MapMode.normal) {
                         _measurePoints.clear();
+                      }
                     });
                   },
                 ),

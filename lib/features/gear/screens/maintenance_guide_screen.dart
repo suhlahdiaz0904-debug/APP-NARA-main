@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/features/gear/screens/gear_manager_screen.dart';
+import 'package:flutter_application_1/core/services/gear_firestore_service.dart';
 
 // =========================================================================
 // HALAMAN PANDUAN PERAWATAN ALAT (GOA & TEBING) - NARA OUTDOOR
@@ -32,6 +33,8 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
 
   late GearManager _gearManager;
   GearItem? _selectedItem;
+  List<Map<String, dynamic>> _cloudLogs = [];
+  bool _isLoadingLogs = false;
 
   @override
   void initState() {
@@ -50,6 +53,26 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
           break;
         }
       }
+    }
+
+    _fetchCloudLogs();
+  }
+
+  Future<void> _fetchCloudLogs() async {
+    if (_selectedItem == null) return;
+    setState(() => _isLoadingLogs = true);
+    try {
+      final logs = await GearFirestoreService.instance.getMaintenanceLogs(
+        itemId: _selectedItem!.id,
+      );
+      if (mounted) {
+        setState(() {
+          _cloudLogs = logs;
+          _isLoadingLogs = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingLogs = false);
     }
   }
 
@@ -223,6 +246,7 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
                                   setState(() {
                                     _selectedItem = item;
                                   });
+                                  _fetchCloudLogs();
                                   Navigator.pop(context);
                                 },
                               ),
@@ -253,7 +277,7 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: bgCream,
+          backgroundColor: context.themeCard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -262,23 +286,23 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: primaryFixed,
+                  color: context.themePrimaryFixed,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.cleaning_services_rounded,
-                  color: darkGreen,
+                  color: context.themePrimary,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Catat Log Perawatan',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: darkGreen,
+                    color: context.themeText,
                   ),
                 ),
               ),
@@ -290,24 +314,25 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
             children: [
               Text(
                 'Alat: ${_selectedItem!.title}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: context.themeText,
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: noteController,
                 maxLines: 3,
+                style: TextStyle(color: context.themeText),
                 decoration: InputDecoration(
                   labelText: 'Catatan Perawatan / Hasil Inspeksi',
                   hintText: 'Tuliskan kondisi alat setelah dirawat...',
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: context.themeSurface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFDCD6CA)),
+                    borderSide: BorderSide(color: context.themeBorder),
                   ),
                 ),
               ),
@@ -316,38 +341,51 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
+              child: Text(
                 'Batal',
-                style: TextStyle(color: Colors.black54),
+                style: TextStyle(color: context.themeTextSecondary),
               ),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
+              icon: const Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 16),
               onPressed: () {
+                final note = noteController.text.trim().isEmpty
+                    ? 'Pembersihan & inspeksi berkala selesai dilakukan.'
+                    : noteController.text.trim();
+
                 _gearManager.recordMaintenance(
                   _selectedItem!.id,
-                  note: noteController.text.trim().isEmpty
-                      ? 'Pembersihan & inspeksi berkala selesai dilakukan.'
-                      : noteController.text.trim(),
+                  note: note,
                 );
+                _fetchCloudLogs();
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(
-                      'Perawatan ${_selectedItem!.title} berhasil dicatat & Siap Digunakan!',
+                    content: Row(
+                      children: [
+                        const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Perawatan ${_selectedItem!.title} berhasil dicatat & disinkronkan ke Firebase Cloud!',
+                          ),
+                        ),
+                      ],
                     ),
                     backgroundColor: readyGreen,
                     behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: darkGreen,
+                backgroundColor: context.themePrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                'Simpan & Tandai Siap',
+              label: const Text(
+                'Simpan ke Cloud',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -395,98 +433,109 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
 
     return Scaffold(
       backgroundColor: context.themeBg,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // 1. Glassmorphism TopAppBar
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back_rounded, color: context.themePrimary),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(
-              'Panduan Perawatan',
-              style: TextStyle(
-                color: context.themePrimary,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                letterSpacing: -0.2,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _gearManager.syncFromFirestore();
+          await _fetchCloudLogs();
+        },
+        color: context.themePrimary,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
+            // 1. Glassmorphism TopAppBar
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back_rounded, color: context.themePrimary),
+                onPressed: () => Navigator.pop(context),
               ),
-            ),
-            centerTitle: true,
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  color: context.themeBg.withValues(alpha: 0.85),
-                ),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_outlined,
-                  color: isDark
-                      ? AppTheme.goldAccentDark
-                      : context.themePrimary,
-                  size: 22,
-                ),
-                tooltip: isDark
-                    ? 'Beralih ke Mode Terang'
-                    : 'Beralih ke Mode Gelap',
-                onPressed: () => ThemeController.instance.toggleTheme(context),
-              ),
-              IconButton(
-                tooltip: 'Pilih Alat Lain',
-                icon: Icon(
-                  Icons.swap_horiz_rounded,
+              title: Text(
+                'Panduan Perawatan',
+                style: TextStyle(
                   color: context.themePrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  letterSpacing: -0.2,
                 ),
-                onPressed: _showGearSelectorSheet,
               ),
-              const SizedBox(width: 6),
-            ],
-          ),
-
-          // 2. Konten Utama
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20.0,
-              vertical: 12.0,
+              centerTitle: true,
+              flexibleSpace: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    color: context.themeBg.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    isDark ? Icons.light_mode_rounded : Icons.dark_mode_outlined,
+                    color: isDark
+                        ? AppTheme.goldAccentDark
+                        : context.themePrimary,
+                    size: 22,
+                  ),
+                  tooltip: isDark
+                      ? 'Beralih ke Mode Terang'
+                      : 'Beralih ke Mode Gelap',
+                  onPressed: () => ThemeController.instance.toggleTheme(context),
+                ),
+                IconButton(
+                  tooltip: 'Pilih Alat Lain',
+                  icon: Icon(
+                    Icons.swap_horiz_rounded,
+                    color: context.themePrimary,
+                  ),
+                  onPressed: _showGearSelectorSheet,
+                ),
+                const SizedBox(width: 6),
+              ],
             ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Quick Selector Bar
-                _buildQuickGearSwitcher(),
-                const SizedBox(height: 18),
 
-                // Hero Section
-                _buildHeroSection(careGuide),
-                const SizedBox(height: 24),
+            // 2. Konten Utama
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 12.0,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Quick Selector Bar
+                  _buildQuickGearSwitcher(),
+                  const SizedBox(height: 18),
 
-                // Bento Grid Perawatan Harian
-                _buildDailyCareSection(careGuide),
-                const SizedBox(height: 24),
+                  // Hero Section
+                  _buildHeroSection(careGuide),
+                  const SizedBox(height: 24),
 
-                // Storage Section (Penyimpanan Ideal)
-                _buildStorageSection(careGuide),
-                const SizedBox(height: 24),
+                  // Bento Grid Perawatan Harian
+                  _buildDailyCareSection(careGuide),
+                  const SizedBox(height: 24),
 
-                // Safety Inspection & Retirement Alert Box
-                _buildSafetyInspectionSection(careGuide),
-                const SizedBox(height: 24),
+                  // Storage Section (Penyimpanan Ideal)
+                  _buildStorageSection(careGuide),
+                  const SizedBox(height: 24),
 
-                // Log Perawatan & Action Box
-                _buildMaintenanceActionBox(),
-                const SizedBox(height: 48),
-              ]),
+                  // Safety Inspection & Retirement Alert Box
+                  _buildSafetyInspectionSection(careGuide),
+                  const SizedBox(height: 24),
+
+                  // Log Perawatan & Action Box
+                  _buildMaintenanceActionBox(),
+                  const SizedBox(height: 24),
+
+                  // Riwayat Log Perawatan dari Cloud Firestore
+                  _buildCloudMaintenanceHistorySection(),
+                  const SizedBox(height: 50),
+                ]),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1149,6 +1198,176 @@ class _PanduanPerawatanPageState extends State<PanduanPerawatanPage> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  // Riwayat Log Perawatan dari Cloud Firestore
+  Widget _buildCloudMaintenanceHistorySection() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: context.themeCard,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: context.themeBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.cloud_done_rounded,
+                    color: Color(0xFF4CAF78),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Riwayat Log Perawatan Cloud',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: context.themeText,
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  size: 18,
+                  color: context.themePrimary,
+                ),
+                tooltip: 'Muat Ulang Log Cloud',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
+                onPressed: _isLoadingLogs ? null : _fetchCloudLogs,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Histori inspeksi dan pembersihan alat tersimpan aman di Firebase Cloud Firestore:',
+            style: TextStyle(
+              fontSize: 11,
+              color: context.themeTextSecondary,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (_isLoadingLogs)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (_cloudLogs.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: context.themeSurface,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: context.themeTextSecondary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Belum ada riwayat log inspeksi di cloud untuk alat ini.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: context.themeTextSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _cloudLogs.length,
+              separatorBuilder: (context, _) => const SizedBox(height: 8),
+              itemBuilder: (context, idx) {
+                final log = _cloudLogs[idx];
+                final DateTime logDate = log['date'] as DateTime? ?? DateTime.now();
+                final String formattedDate =
+                    '${logDate.day}/${logDate.month}/${logDate.year} ${logDate.hour.toString().padLeft(2, '0')}:${logDate.minute.toString().padLeft(2, '0')}';
+                final String inspector = log['recordedBy'] as String? ?? 'Petualang NARA';
+                final String note = log['note'] as String? ?? '-';
+
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: context.themeSurface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: context.themeBorder.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.verified_user_outlined,
+                                size: 14,
+                                color: context.themePrimary,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                inspector,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: context.themeText,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            formattedDate,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: context.themeTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        note,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.themeText,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );

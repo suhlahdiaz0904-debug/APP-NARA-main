@@ -2,14 +2,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_application_1/core/theme/theme_provider.dart';
+import 'package:flutter_application_1/core/database/database_helper.dart';
+import 'package:flutter_application_1/core/services/review_sync_service.dart';
 
 class TulisUlasanPage extends StatefulWidget {
+  final String? spotId;
   final String title;
   final String date;
   final String thumbnail;
 
   const TulisUlasanPage({
     super.key,
+    this.spotId,
     this.title = 'Citatah Ekspedisi',
     this.date = '12 Okt 2023',
     this.thumbnail = 'assets/images/fotober4.jpeg',
@@ -217,7 +221,7 @@ class _TulisUlasanPageState extends State<TulisUlasanPage> {
     });
   }
 
-  void _submitReview() {
+  Future<void> _submitReview() async {
     if (_rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -238,10 +242,54 @@ class _TulisUlasanPageState extends State<TulisUlasanPage> {
       return;
     }
 
+    setState(() => _isLoading = true);
+
+    String authorName = 'Penjelajah NARA';
+    String authorRole = 'Penjelajah';
+    String? authorAvatar;
+
+    try {
+      final activeUser = await DatabaseHelper.instance.getLatestUser();
+      if (activeUser != null) {
+        authorName = activeUser.nama;
+        authorRole = activeUser.rolePetualang ?? 'Penjelajah';
+        authorAvatar = activeUser.fotoProfil;
+      }
+    } catch (_) {}
+
+    final List<String> photoPaths = _selectedFiles.map((f) => f.path).toList();
+    final String commentText = _reviewController.text.trim();
+    final double ratingVal = _rating.toDouble();
+
+    // Simpan ke SQLite & Cloud Firestore
+    try {
+      await ReviewSyncService.instance.submitReview(
+        spotId: widget.spotId ?? widget.title,
+        destinationName: widget.title,
+        userName: authorName,
+        userRole: authorRole,
+        userAvatar: authorAvatar,
+        rating: ratingVal,
+        comment: commentText,
+        photos: photoPaths,
+      );
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Ulasan berhasil dikirim & tersinkron ke Cloud Firestore!'),
+        backgroundColor: context.themePrimary,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
     Navigator.pop(context, {
       'rating': _rating,
-      'comment': _reviewController.text.trim(),
-      'photos': _selectedFiles.map((f) => f.path).toList(),
+      'comment': commentText,
+      'photos': photoPaths,
       'date': DateTime.now(),
     });
   }

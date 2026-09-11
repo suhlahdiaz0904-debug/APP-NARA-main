@@ -12,7 +12,6 @@ import 'package:flutter_application_1/features/map/screens/interactive_map_scree
 import 'package:flutter_application_1/features/map/screens/spot_detail_screen.dart';
 import 'package:flutter_application_1/data/cave_data.dart';
 import 'package:flutter_application_1/features/gear/screens/gear_screen.dart';
-import 'package:flutter_application_1/features/gear/screens/gear_manager_screen.dart';
 import 'package:flutter_application_1/features/gear/screens/maintenance_guide_screen.dart';
 import 'package:flutter_application_1/features/safety/screens/safety_screen.dart';
 import 'package:flutter_application_1/features/profile/screens/profile_screen.dart';
@@ -399,7 +398,6 @@ class NaraHomePage extends StatefulWidget {
 
 class _NaraHomePageState extends State<NaraHomePage> {
   int _selectedNavIndex = 0;
-  late Future<WeatherModel> _weatherFuture;
   bool _isLoadingLocation = false;
 
   final List<Map<String, dynamic>> _expedisiList = [
@@ -562,96 +560,8 @@ class _NaraHomePageState extends State<NaraHomePage> {
   ];
 
   UserModel? _currentUser;
-  String _selectedCategoryFilter = 'Semua';
 
-  final List<Map<String, dynamic>> _filterCategories = [
-    {
-      'name': 'Semua',
-      'label': 'Semua',
-      'icon': Icons.auto_awesome_rounded,
-      'gradient': [Color(0xFF143023), Color(0xFF2E7D32)],
-      'accentColor': Color(0xFF4CAF78),
-      'unselectedBg': Color(0xFFE8F5E9),
-      'unselectedIcon': Color(0xFF2E7D32),
-    },
-    {
-      'name': 'Tebing',
-      'label': 'Tebing & Rock',
-      'icon': Icons.terrain_rounded,
-      'gradient': [Color(0xFFD84315), Color(0xFFFF6E40)],
-      'accentColor': Color(0xFFFFAB91),
-      'unselectedBg': Color(0xFFFBE9E7),
-      'unselectedIcon': Color(0xFFD84315),
-    },
-    {
-      'name': 'Goa & Karst',
-      'label': 'Goa & Caving',
-      'icon': Icons.dark_mode_rounded,
-      'gradient': [Color(0xFF4527A0), Color(0xFF7C4DFF)],
-      'accentColor': Color(0xFFB388FF),
-      'unselectedBg': Color(0xFFEDE7F6),
-      'unselectedIcon': Color(0xFF512DA8),
-    },
-    {
-      'name': 'Gear',
-      'label': 'Gear & Alat',
-      'icon': Icons.backpack_rounded,
-      'gradient': [Color(0xFF00695C), Color(0xFF00BFA5)],
-      'accentColor': Color(0xFFA7FFEB),
-      'unselectedBg': Color(0xFFE0F2F1),
-      'unselectedIcon': Color(0xFF00796B),
-    },
-    {
-      'name': 'Cuaca',
-      'label': 'Cuaca Live',
-      'icon': Icons.wb_sunny_rounded,
-      'gradient': [Color(0xFF0277BD), Color(0xFF00B0FF)],
-      'accentColor': Color(0xFF80D8FF),
-      'unselectedBg': Color(0xFFE1F5FE),
-      'unselectedIcon': Color(0xFF0288D1),
-    },
-    {
-      'name': 'Acara',
-      'label': 'Kabar & Acara',
-      'icon': Icons.campaign_rounded,
-      'gradient': [Color(0xFFC2185B), Color(0xFFFF4081)],
-      'accentColor': Color(0xFFFF80AB),
-      'unselectedBg': Color(0xFFFCE4EC),
-      'unselectedIcon': Color(0xFFC2185B),
-    },
-  ];
-
-  List<Map<String, dynamic>> get _filteredExpeditions {
-    if (_selectedCategoryFilter == 'Semua' ||
-        _selectedCategoryFilter == 'Gear' ||
-        _selectedCategoryFilter == 'Cuaca' ||
-        _selectedCategoryFilter == 'Acara') {
-      return _expedisiList;
-    }
-    if (_selectedCategoryFilter == 'Tebing') {
-      return _expedisiList.where((exp) {
-        final title = (exp['title'] ?? '').toString().toLowerCase();
-        final type = (exp['type'] ?? '').toString().toLowerCase();
-        return title.contains('tebing') ||
-            type.contains('andesit') ||
-            type.contains('granit') ||
-            type.contains('limestone') ||
-            type.contains('ngarai');
-      }).toList();
-    }
-    if (_selectedCategoryFilter == 'Goa & Karst') {
-      return _expedisiList.where((exp) {
-        final title = (exp['title'] ?? '').toString().toLowerCase();
-        final type = (exp['type'] ?? '').toString().toLowerCase();
-        return title.contains('goa') ||
-            title.contains('gua') ||
-            title.contains('karst') ||
-            type.contains('cave') ||
-            type.contains('karst');
-      }).toList();
-    }
-    return _expedisiList;
-  }
+  List<Map<String, dynamic>> get _filteredExpeditions => _expedisiList;
 
   @override
   void initState() {
@@ -659,7 +569,6 @@ class _NaraHomePageState extends State<NaraHomePage> {
     for (final c in KlapanunggalCavesData.caves) {
       _expedisiList.add(Map<String, dynamic>.from(c));
     }
-    _weatherFuture = WeatherService.fetchRealtimeWeather();
     _initDeviceLocationAndSort();
     _loadRegisteredUser();
   }
@@ -730,9 +639,6 @@ class _NaraHomePageState extends State<NaraHomePage> {
   }
 
   void _refreshWeather() {
-    setState(() {
-      _weatherFuture = WeatherService.fetchRealtimeWeather();
-    });
     _initDeviceLocationAndSort();
   }
 
@@ -799,10 +705,6 @@ class _NaraHomePageState extends State<NaraHomePage> {
   }
 
   Widget _buildHomeContent() {
-    final int readyGearCount = GearManager.readyCount;
-    final int totalGearCount = GearManager.totalCount;
-    final bool isAllGearReady = GearManager.isAllReady;
-
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
@@ -873,339 +775,37 @@ class _NaraHomePageState extends State<NaraHomePage> {
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               Text(
-                'PETUALANGAN ANDA DIMULAI',
+                'LOREM IPSUM DOLOR IST LOR',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: context.themeTextSecondary,
-                  letterSpacing: 1.2,
+                  letterSpacing: 1.0,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                'Halo ${_currentUser?.nama ?? "Farhiyah"}!',
+                'HALO ${_currentUser != null ? _currentUser!.nama.toUpperCase() : "USER 123"}',
                 style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
                   color: context.themeText,
+                  letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
-              // Filter Tampilan Berwarna (Kategori Cepat)
-              _buildColorFilterChips(),
-              const SizedBox(height: 16),
+              // 1. Widget Baris Tombol: CUACA & PETA OFFLINE
+              _buildWeatherAndMapRow(),
+              const SizedBox(height: 22),
 
-              _buildMainActionCard(),
-              const SizedBox(height: 12),
-
-              // 1. Kartu Peta Offline (Tema Hijau Emerald)
-              _buildInfoCard(
-                icon: Icons.map_outlined,
-                title: 'Peta Offline Saya',
-                iconColor: Colors.white,
-                iconBgGradient: const [Color(0xFF1B5E20), Color(0xFF43A047)],
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const PetaOfflinePage(),
-                    ),
-                  );
-                },
-                badge: const Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 14,
-                      color: Color(0xFF2E7D32),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'UNDUHAN SIAP',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E7D32),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // 2. Kartu Periksa Gear (Tema Sunset Amber/Orange)
-              _buildInfoCard(
-                icon: Icons.calendar_today_outlined,
-                title: 'Periksa Gear Kamu',
-                iconColor: Colors.white,
-                iconBgGradient: const [Color(0xFFE65100), Color(0xFFFF9800)],
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const PeriksaGearPage(),
-                    ),
-                  );
-                  setState(() {});
-                },
-                badge: Row(
-                  children: [
-                    if (isAllGearReady) ...[
-                      const Icon(
-                        Icons.check_circle,
-                        size: 14,
-                        color: Color(0xFF2E7D32),
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                    Text(
-                      '$readyGearCount/$totalGearCount SIAP',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isAllGearReady
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFE53935),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // 3. Kartu Panduan Perawatan Alat (Tema Teal Karst)
-              _buildInfoCard(
-                icon: Icons.menu_book_rounded,
-                title: 'Panduan Perawatan Alat',
-                iconColor: Colors.white,
-                iconBgGradient: const [Color(0xFF00695C), Color(0xFF26A69A)],
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const PanduanPerawatanPage(),
-                    ),
-                  );
-                  setState(() {});
-                },
-                badge: const Row(
-                  children: [
-                    Icon(
-                      Icons.shield_outlined,
-                      size: 14,
-                      color: Color(0xFF2E7D32),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'GOA & TEBING',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E7D32),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // 2. Widget Banner: RENCANAKAN (Dengan link Panduan Perawatan Peralatan)
+              _buildRencanakanBanner(),
               const SizedBox(height: 28),
 
-              // 3. Header Cuaca Real-Time
-              _buildSectionHeader(
-                title: 'PERKIRAAN CUACA REAL-TIME',
-                actionWidget: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const WeatherScreen(),
-                      ),
-                    ).then((_) => _refreshWeather());
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF143023),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.arrow_forward,
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // 4. Baris Kartu Cuaca Real-Time Berbasis GPS
-              FutureBuilder<WeatherModel>(
-                future: _weatherFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Row(
-                      children: List.generate(
-                        3,
-                        (index) => Expanded(
-                          child: Container(
-                            height: 110,
-                            margin: EdgeInsets.only(
-                              right: index < 2 ? 12.0 : 0.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: context.themeSurface,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: context.themePrimary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.hasError || !snapshot.hasData) {
-                    return GestureDetector(
-                      onTap: _refreshWeather,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: context.themeSurface,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.refresh,
-                              color: context.themeTerracotta,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Ketuk untuk memuat cuaca GPS',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: context.themeTerracotta,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  final weather = snapshot.data!;
-                  final displayHourly = weather.hourly.take(3).toList();
-
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const WeatherScreen(),
-                        ),
-                      ).then((_) => _refreshWeather());
-                    },
-                    child: Row(
-                      children: displayHourly.asMap().entries.map((entry) {
-                        final int idx = entry.key;
-                        final item = entry.value;
-
-                        return Expanded(
-                          child: Container(
-                            margin: EdgeInsets.only(
-                              right: idx < 2 ? 12.0 : 0.0,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            decoration: BoxDecoration(
-                              color: context.themeSurface,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  item['time'],
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: context.themeTextSecondary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Icon(
-                                  item['icon'] as IconData,
-                                  color: item['iconColor'] as Color,
-                                  size: 26,
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  item['temp'],
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: context.themeText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 28),
-
-              // 5. Section Berita Acara & Kabar Terkini (Geser Horizontal)
-              _buildSectionHeader(
-                title: 'BERITA ACARA & KABAR TERKINI',
-                actionWidget: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const BuatBeritaAcaraPage(),
-                        ),
-                      );
-                      if (result != null) {
-                        setState(() {});
-                      }
-                    },
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: context.themeSurfaceHigh,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.add,
-                        color: context.themeText,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
+              // 3. Section LAPORAN TERBARU (Dengan tombol + TAMBAH)
+              _buildLaporanTerbaruHeader(),
+              const SizedBox(height: 14),
               SizedBox(
                 height: 380,
                 child: ListView.builder(
@@ -1267,7 +867,7 @@ class _NaraHomePageState extends State<NaraHomePage> {
               ),
               const SizedBox(height: 28),
 
-              // 6. Section Ekspedisi Disarankan (Sinkronisasi Jarak Terdekat dari Lokasi Device)
+              // 4. Section Ekspedisi Disarankan (Sinkronisasi Jarak Terdekat dari Lokasi Device)
               _buildSectionHeader(
                 title: 'EKSPEDISI DISARANKAN',
                 actionWidget: GestureDetector(
@@ -1355,6 +955,268 @@ class _NaraHomePageState extends State<NaraHomePage> {
               ),
               const SizedBox(height: 100),
             ]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 1. Widget Baris Tombol CUACA & PETA OFFLINE (Sesuai Desain Stitch UI)
+  Widget _buildWeatherAndMapRow() {
+    final bool isDark = context.isDarkMode;
+    const Color darkNavy = Color(0xFF1B2042);
+
+    return Row(
+      children: [
+        // Tombol CUACA (Solid Dark Container)
+        Expanded(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const WeatherScreen(),
+                  ),
+                ).then((_) => _refreshWeather());
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Ink(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1B2338) : darkNavy,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark ? Colors.white24 : Colors.transparent,
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: darkNavy.withValues(alpha: 0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD6D7E3),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: const Icon(
+                        Icons.wb_sunny_rounded,
+                        color: darkNavy,
+                        size: 17,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'CUACA',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Tombol PETA OFFLINE (Outlined / Light Container)
+        Expanded(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PetaOfflinePage(),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Ink(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: isDark ? context.themeSurface : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark ? Colors.white30 : darkNavy,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF323B5A) : darkNavy,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: const Icon(
+                        Icons.map_rounded,
+                        color: Colors.white,
+                        size: 17,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'PETA\nOFFLINE',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : darkNavy,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                        height: 1.1,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 2. Widget Banner RENCANAKAN dengan Panduan Perawatan Peralatan interaktif
+  Widget _buildRencanakanBanner() {
+    final bool isDark = context.isDarkMode;
+    final Color bannerBg =
+        isDark ? const Color(0xFF2C322F) : const Color(0xFFD6D6D6);
+    final Color textColor = isDark ? Colors.white : Colors.black;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 26),
+      decoration: BoxDecoration(
+        color: bannerBg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'RENCANAKAN',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              color: textColor,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'JANGAN LUPA KESELAMATAN',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white70 : Colors.black87,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PanduanPerawatanPage(),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2.0),
+                child: Text(
+                  'PANDUAN PERAWATAN PERALATAN',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? AppTheme.darkPrimary : Colors.black,
+                    decoration: TextDecoration.underline,
+                    decorationThickness: 1.5,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 3. Header LAPORAN TERBARU dengan Tombol "+ TAMBAH"
+  Widget _buildLaporanTerbaruHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'LAPORAN TERBARU',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: context.themeText,
+            letterSpacing: 0.5,
+          ),
+        ),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BuatBeritaAcaraPage(),
+                ),
+              );
+              if (result != null) {
+                setState(() {});
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF264E36),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                '+ TAMBAH',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -1582,321 +1444,6 @@ class _NaraHomePageState extends State<NaraHomePage> {
         ),
       );
     }
-  }
-
-  Widget _buildMainActionCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: context.themeCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.themeBorder, width: 0.8),
-        boxShadow: [
-          BoxShadow(
-            color: context.isDarkMode
-                ? Colors.black.withValues(alpha: 0.2)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -20,
-            top: -20,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE5E0D5),
-                shape: BoxShape.circle,
-                image: DecorationImage(
-                  image: AssetImage('assets/images/sula.jpeg'),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: context.themeTerracotta.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.explore_outlined,
-                  color: context.themeTerracotta,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Rencanakan Petualangan Baru',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: context.themeText,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Mulai rute ekspedisi Anda',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.themeTextSecondary,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildColorFilterChips() {
-    final bool isDark = context.isDarkMode;
-
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _filterCategories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = _filterCategories[index];
-          final String name = cat['name'] as String;
-          final String label = cat['label'] as String;
-          final IconData icon = cat['icon'] as IconData;
-          final List<Color> gradient = cat['gradient'] as List<Color>;
-          final Color accentColor = cat['accentColor'] as Color;
-          final Color unselectedBg = cat['unselectedBg'] as Color;
-          final Color unselectedIcon = cat['unselectedIcon'] as Color;
-          final bool isSelected = _selectedCategoryFilter == name;
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedCategoryFilter = name;
-              });
-              if (name == 'Gear') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PeriksaGearPage(),
-                  ),
-                );
-              } else if (name == 'Cuaca') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const WeatherScreen(),
-                  ),
-                );
-              } else if (name == 'Acara') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BuatBeritaAcaraPage(),
-                  ),
-                );
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? LinearGradient(
-                        colors: gradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isSelected
-                    ? null
-                    : (isDark
-                          ? context.themeSurface
-                          : unselectedBg.withValues(alpha: 0.85)),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isSelected
-                      ? accentColor.withValues(alpha: 0.7)
-                      : (isDark
-                            ? Colors.white.withValues(alpha: 0.12)
-                            : unselectedIcon.withValues(alpha: 0.3)),
-                  width: isSelected ? 1.5 : 1.0,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: gradient.last.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white.withValues(alpha: 0.25)
-                          : (isDark
-                                ? unselectedIcon.withValues(alpha: 0.25)
-                                : Colors.white),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 14,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? accentColor : unselectedIcon),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: isSelected
-                          ? FontWeight.w800
-                          : FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark
-                                ? context.themeText
-                                : const Color(0xFF1E293B)),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required Widget badge,
-    Color? iconColor,
-    List<Color>? iconBgGradient,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: context.themeCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.themeBorder, width: 0.8),
-        boxShadow: [
-          BoxShadow(
-            color: context.isDarkMode
-                ? Colors.black.withValues(alpha: 0.2)
-                : Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    gradient: iconBgGradient != null
-                        ? LinearGradient(
-                            colors: iconBgGradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    color: iconBgGradient == null
-                        ? context.themeTerracotta.withValues(alpha: 0.14)
-                        : null,
-                    shape: BoxShape.circle,
-                    boxShadow: iconBgGradient != null
-                        ? [
-                            BoxShadow(
-                              color: iconBgGradient.last.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Icon(
-                    icon,
-                    color: iconColor ?? context.themeTerracotta,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: context.themeText,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      badge,
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: context.themePrimary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward,
-                    color: context.isDarkMode
-                        ? const Color(0xFF0F1713)
-                        : Colors.white,
-                    size: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildSectionHeader({required String title, Widget? actionWidget}) {

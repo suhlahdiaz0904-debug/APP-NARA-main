@@ -11,6 +11,7 @@ import 'package:flutter_application_1/features/safety/screens/friend_tracker_scr
 import 'package:flutter_application_1/features/safety/screens/women_safety_screen.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:flutter_application_1/features/weather/screens/weather_screen.dart';
+import 'package:flutter_application_1/core/services/safety_firestore_service.dart';
 
 // =========================================================================
 // HALAMAN FITUR KEAMANAN (NARA SAFETY DASHBOARD)
@@ -49,6 +50,11 @@ class _KeamananPageState extends State<KeamananPage>
 
   Timer? _clockTimer;
   String _selectedSafetyFilter = 'Semua';
+
+  // Firebase Streams & State
+  StreamSubscription? _sosAlertsSubscription;
+  StreamSubscription? _liveTrackersSubscription;
+  final List<Map<String, dynamic>> _remoteSosAlerts = [];
 
   final List<Map<String, dynamic>> _safetyFilterCategories = [
     {
@@ -98,7 +104,7 @@ class _KeamananPageState extends State<KeamananPage>
     },
   ];
 
-  // Data Teman Luring (Offline Mesh Tracker) berasal dari pengguna terdaftar yang berada di sekitar lokasi saat ini
+  // Data Teman Luring (Offline Mesh Tracker) berasal dari Firebase Firestore & SQLite
   final List<Map<String, dynamic>> _offlinePeers = [];
   double _currentLat = -6.8396;
   double _currentLon = 107.4524;
@@ -127,10 +133,90 @@ class _KeamananPageState extends State<KeamananPage>
     });
 
     _fetchRealtimeLocationAndWeather();
+    _initFirebaseSubscriptions();
+  }
+
+  /// Inisialisasi pendengar Firebase Firestore untuk Sinyal Darurat SOS & Live Trackers
+  void _initFirebaseSubscriptions() {
+    _sosAlertsSubscription = SafetyFirestoreService.instance
+        .getActiveSosAlertsStream()
+        .listen((alerts) {
+      if (!mounted) return;
+      final currentUid = SafetyFirestoreService.instance.currentUserId;
+      // Filter alert dari user lain (bukan diri sendiri)
+      final otherAlerts = alerts.where((a) => a['userId'] != currentUid).toList();
+      setState(() {
+        _remoteSosAlerts
+          ..clear()
+          ..addAll(otherAlerts);
+      });
+    });
+
+    _liveTrackersSubscription = SafetyFirestoreService.instance
+        .getLiveTrackersStream()
+        .listen((trackers) {
+      if (!mounted) return;
+      _processLiveTrackers(trackers);
+    });
+  }
+
+  void _processLiveTrackers(List<Map<String, dynamic>> trackers) {
+    final currentUid = SafetyFirestoreService.instance.currentUserId;
+    final otherTrackers = trackers.where((t) => t['userId'] != currentUid && (t['latitude'] != 0.0 || t['longitude'] != 0.0)).toList();
+
+    if (otherTrackers.isNotEmpty) {
+      final List<Map<String, dynamic>> livePeers = [];
+      for (int i = 0; i < otherTrackers.length; i++) {
+        final tracker = otherTrackers[i];
+        final lat = tracker['latitude'] as double;
+        final lon = tracker['longitude'] as double;
+        final distanceMeters = Geolocator.distanceBetween(_currentLat, _currentLon, lat, lon);
+
+        final name = tracker['userName'] as String? ?? 'Petualang';
+        final initials = name
+            .trim()
+            .split(RegExp(r'\s+'))
+            .where((v) => v.isNotEmpty)
+            .map((v) => v[0].toUpperCase())
+            .take(2)
+            .join();
+
+        final distLabel = distanceMeters < 1000
+            ? '${distanceMeters.round()} m'
+            : '${(distanceMeters / 1000).toStringAsFixed(1)} km';
+
+        livePeers.add({
+          'initials': initials.isEmpty ? 'U' : initials,
+          'name': name,
+          'distance': distLabel,
+          'direction': tracker['status'] == 'sos' ? 'SOS AKTIF' : (distanceMeters < 500 ? 'Dekat' : 'Sekitar'),
+          'battery': '${tracker['battery'] ?? 85}%',
+          'elevation': tracker['altitude'] ?? '420 mdpl',
+          'color': tracker['status'] == 'sos'
+              ? errorRed
+              : (i % 2 == 0 ? const Color(0xFFFED65B) : const Color(0xFFC5ECD2)),
+          'textColor': tracker['status'] == 'sos'
+              ? Colors.white
+              : (i % 2 == 0 ? const Color(0xFF574500) : const Color(0xFF002112)),
+          'lastSeen': 'Live Firebase',
+          'status': tracker['status'] ?? 'normal',
+        });
+      }
+
+      setState(() {
+        _offlinePeers
+          ..clear()
+          ..addAll(livePeers);
+      });
+    } else {
+      _loadNearbyUsers();
+    }
   }
 
   @override
   void dispose() {
+    _sosAlertsSubscription?.cancel();
+    _liveTrackersSubscription?.cancel();
     _clockTimer?.cancel();
     _pulseController.dispose();
     _holdController.dispose();
@@ -183,6 +269,14 @@ class _KeamananPageState extends State<KeamananPage>
           _elevationText = '${pos.altitude.round()} m ASL';
         });
       }
+
+      // Broadcast lokasi ke Firebase Firestore
+      SafetyFirestoreService.instance.broadcastUserLocation(
+        latitude: lat,
+        longitude: lon,
+        altitude: '${pos.altitude.round()} m ASL',
+        status: 'normal',
+      );
 
       await _loadNearbyUsers();
 
@@ -325,13 +419,22 @@ class _KeamananPageState extends State<KeamananPage>
       _isHoldingSos = false;
     });
 
+    // Menerbitkan sinyal darurat SOS ke Firebase Firestore
+    final alertId = await SafetyFirestoreService.instance.publishSosAlert(
+      latitude: _currentLat,
+      longitude: _currentLon,
+      altitude: _elevationText,
+    );
+
     // Navigasi ke Halaman SOS Aktif (Sesuai Desain Stitch Google)
+    if (!mounted) return;
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => SosAktifPage(
           initialCoordinates: '$_latText, $_lonText',
           initialAltitude: _elevationText,
+          initialAlertId: alertId,
         ),
       ),
     );
@@ -764,6 +867,85 @@ class _KeamananPageState extends State<KeamananPage>
                   // Filter Fitur Keamanan Berwarna
                   _buildSafetyFilterChips(),
                   const SizedBox(height: 18),
+
+                  // =================================================================
+                  // NOTIFIKASI DARURAT SOS MASUK (DARI REKAN TIM DI FIRESTORE)
+                  // =================================================================
+                  if (_remoteSosAlerts.isNotEmpty) ...[
+                    ..._remoteSosAlerts.map((alert) {
+                      final victimName = alert['userName'] ?? 'Rekan Petualang';
+                      final alertLat = (alert['latitude'] as num?)?.toDouble() ?? 0.0;
+                      final alertLon = (alert['longitude'] as num?)?.toDouble() ?? 0.0;
+                      final distM = Geolocator.distanceBetween(_currentLat, _currentLon, alertLat, alertLon);
+                      final distText = distM < 1000 ? '${distM.round()} m' : '${(distM / 1000).toStringAsFixed(1)} km';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1C1C18),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: errorRed, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: errorRed.withValues(alpha: 0.3),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: errorRed.withValues(alpha: 0.25),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.emergency_rounded, color: errorRed, size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '🚨 SOS DARURAT DITERIMA!',
+                                    style: TextStyle(
+                                      color: Color(0xFFFFDAD6),
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '$victimName memicu sinyal darurat ($distText dari Anda)',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: _bukaHalamanPelacakTeman,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: errorRed,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text(
+                                'LACAK',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
 
                   // =================================================================
                   // 2. SOS CARD (INTERACTIVE TRIGGER & SATELLITE LINK)

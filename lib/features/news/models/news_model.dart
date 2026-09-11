@@ -1,6 +1,6 @@
 import 'dart:convert';
-
 import 'package:flutter_application_1/core/database/database_helper.dart';
+import 'package:flutter_application_1/core/services/news_firestore_service.dart';
 
 class BeritaModel {
   final String id;
@@ -286,18 +286,31 @@ class BeritaManager {
       _beritaList
         ..clear()
         ..addAll(beritaDb.map(BeritaModel.fromMap));
-      return;
+    } else {
+      for (final item in _beritaList) {
+        await DatabaseHelper.instance.saveBeritaAcara(item.toMap());
+      }
     }
 
-    for (final item in _beritaList) {
-      await DatabaseHelper.instance.saveBeritaAcara(item.toMap());
-    }
+    // Sinkronisasi otomatis di latar belakang dengan Cloud Firestore
+    try {
+      await NewsFirestoreService.instance.syncNewsPosts();
+      final refreshedDb = await DatabaseHelper.instance.getAllBeritaAcara();
+      if (refreshedDb.isNotEmpty) {
+        _beritaList
+          ..clear()
+          ..addAll(refreshedDb.map(BeritaModel.fromMap));
+      }
+    } catch (_) {}
   }
 
   static Future<void> tambahBerita(BeritaModel item) async {
     await DatabaseHelper.instance.saveBeritaAcara(item.toMap());
     _beritaList.removeWhere((berita) => berita.id == item.id);
     _beritaList.insert(0, item);
+
+    // Sinkronkan ke Cloud Firestore
+    NewsFirestoreService.instance.saveNewsPostToCloud(item);
   }
 
   static Future<void> updateBeritaStatus(String id, String status) async {
@@ -306,6 +319,7 @@ class BeritaManager {
       final updated = _beritaList[index].copyWith(status: status);
       _beritaList[index] = updated;
       await DatabaseHelper.instance.saveBeritaAcara(updated.toMap());
+      NewsFirestoreService.instance.saveNewsPostToCloud(updated);
     }
   }
 
@@ -319,6 +333,9 @@ class BeritaManager {
       );
       _beritaList[index] = updated;
       await DatabaseHelper.instance.saveBeritaAcara(updated.toMap());
+
+      // Kirim vote ke Cloud Firestore
+      NewsFirestoreService.instance.voteNewsPost(newsId: id, isUpvote: isUpvote);
     }
   }
 

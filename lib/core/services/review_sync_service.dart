@@ -1,66 +1,118 @@
-import 'dart:convert';
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_application_1/core/database/daos/review_dao.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:flutter_application_1/features/news/models/review_model.dart';
-import 'package:http/http.dart' as http;
 
 /// =========================================================================
-/// REVIEW CLOUD SYNCHRONIZATION SERVICE (CROSS-DEVICE GLOBAL SYNC)
+/// SPOT REVIEWS FIRESTORE SERVICE (CROSS-DEVICE CLOUD SYNC)
 /// =========================================================================
-/// Handles real-time cross-device synchronization of explorer reviews
-/// using local SQLite caching and Cloud REST API sync.
+/// Layanan terpusat untuk sinkronisasi Real-Time Firebase Firestore:
+/// 1. Ulasan, Rating Bintang, dan Dokumentasi Spot Tebing & Goa
+/// 2. Offline-First Architecture (SQLite Local Cache + Cloud Firestore Two-Way Sync)
+/// 3. Real-Time Stream Ulasan Pengguna Antar Perangkat
 class ReviewSyncService {
   static final ReviewSyncService instance = ReviewSyncService._init();
 
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   ReviewSyncService._init();
 
-  // Cloud REST API Endpoint for global cross-device synchronization
-  static const String _cloudApiBaseUrl = 'https://api.restful-api.dev/objects';
-  static const Duration _timeout = Duration(seconds: 5);
+  static const String _collectionName = 'nara_spot_reviews';
 
-  /// Retrieves reviews for a specific spot.
-  /// First returns local cached reviews, then attempts cloud sync in background.
+  /// Mendapatkan ID pengguna aktif Firebase atau ID fallback
+  String get _currentUserId {
+    final user = _auth.currentUser;
+    if (user != null && user.uid.isNotEmpty) {
+      return user.uid;
+    }
+    return 'default_nara_reviewer';
+  }
+
+  /// Koleksi ulasan spot di Cloud Firestore
+  CollectionReference<Map<String, dynamic>> get _reviewsCollection {
+    return _firestore.collection(_collectionName);
+  }
+
+  // =========================================================================
+  // 1. MENGAMBIL ULASAN SPOT (SQLITE + FIRESTORE SYNC)
+  // =========================================================================
+
+  /// Mengambil ulasan untuk suatu spot tebing/goa.
+  /// Menampilkan cache lokal SQLite secara instan, lalu menyinkronkan data dari Cloud Firestore.
   Future<List<ReviewModel>> getReviewsForSpot({
     required String spotId,
     String? destinationName,
     bool fetchFromCloud = true,
   }) async {
-    final cleanSpotId = ReviewDao.normalizeSpotId(spotId.isNotEmpty ? spotId : (destinationName ?? 'spot'));
+    final cleanSpotId = ReviewDao.normalizeSpotId(
+      spotId.isNotEmpty ? spotId : (destinationName ?? 'spot'),
+    );
 
-    // 1. Ambil data lokal SQLite terlebih dahulu (offline-first, super cepat)
+    // 1. Ambil data lokal SQLite terlebih dahulu (offline-first)
     List<ReviewModel> localReviews = [];
     try {
-      localReviews = await DatabaseHelper.instance.reviewDao.getReviewsForSpot(cleanSpotId);
-      if (destinationName != null && destinationName.isNotEmpty && localReviews.isEmpty) {
-        localReviews = await DatabaseHelper.instance.reviewDao.getReviewsForSpot(destinationName);
+      localReviews = await DatabaseHelper.instance.reviewDao.getReviewsForSpot(
+        cleanSpotId,
+      );
+      if (destinationName != null &&
+          destinationName.isNotEmpty &&
+          localReviews.isEmpty) {
+        localReviews = await DatabaseHelper.instance.reviewDao.getReviewsForSpot(
+          destinationName,
+        );
       }
     } catch (e) {
       debugPrint('[ReviewSyncService] Error fetching local reviews: $e');
     }
 
-    // 2. Jika sinkronisasi cloud aktif, lakukan sinkronisasi di background
+    // 2. Jika sinkronisasi cloud aktif, lakukan query ke Cloud Firestore
     if (fetchFromCloud) {
       try {
         final cloudReviews = await _fetchReviewsFromCloud(cleanSpotId);
         if (cloudReviews.isNotEmpty) {
-          // Simpan seluruh ulasan baru dari device lain ke SQLite lokal
+          // Simpan seluruh ulasan baru dari Firestore ke SQLite lokal
           await DatabaseHelper.instance.reviewDao.saveAllReviews(cloudReviews);
-          
-          // Re-query dari SQLite untuk mendapatkan data gabungan terbaru
-          localReviews = await DatabaseHelper.instance.reviewDao.getReviewsForSpot(cleanSpotId);
+
+          // Ambil kembali data gabungan terbaru dari SQLite
+          localReviews = await DatabaseHelper.instance.reviewDao.getReviewsForSpot(
+            cleanSpotId,
+          );
         }
       } catch (e) {
-        debugPrint('[ReviewSyncService] Cloud fetch error (using local cache): $e');
+        debugPrint('[ReviewSyncService] Cloud Firestore fetch error (using local cache): $e');
       }
     }
 
-    // 3. Pastikan ulasan selalu terurut yang terbaru di paling atas (descending)
+    // 3. Pastikan ulasan selalu terurut descending (terbaru di atas)
     localReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return localReviews;
   }
 
-  /// Submits a new review: saves locally first, then uploads to cloud for other users to see.
+  /// Stream Real-Time untuk ulasan spot tertentu dari Cloud Firestore
+  Stream<List<ReviewModel>> streamReviewsForSpot(String spotId) {
+    final cleanSpotId = ReviewDao.normalizeSpotId(spotId);
+    return _reviewsCollection
+        .where('spotId', isEqualTo: cleanSpotId)
+        .snapshots()
+        .map((snapshot) {
+          final list = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return ReviewModel.fromJson(data);
+          }).toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
+  }
+
+  // =========================================================================
+  // 2. MENULIS & MENGIRIM ULASAN BARU (SUBMIT REVIEW)
+  // =========================================================================
+
+  /// Menyimpan ulasan baru: Simpan ke SQLite lokal dahulu, kemudian kirim ke Cloud Firestore.
   Future<ReviewModel> submitReview({
     required String spotId,
     required String destinationName,
@@ -71,7 +123,9 @@ class ReviewSyncService {
     required String comment,
     List<String> photos = const [],
   }) async {
-    final cleanSpotId = ReviewDao.normalizeSpotId(spotId.isNotEmpty ? spotId : destinationName);
+    final cleanSpotId = ReviewDao.normalizeSpotId(
+      spotId.isNotEmpty ? spotId : destinationName,
+    );
     final now = DateTime.now();
     final reviewId = 'rev_${cleanSpotId}_${now.millisecondsSinceEpoch}';
 
@@ -94,10 +148,10 @@ class ReviewSyncService {
     try {
       await DatabaseHelper.instance.reviewDao.saveReview(newReview);
     } catch (e) {
-      debugPrint('[ReviewSyncService] Local save error: $e');
+      debugPrint('[ReviewSyncService] Local SQLite save error: $e');
     }
 
-    // 2. Upload ke Cloud REST API agar muncul di device pengguna lain
+    // 2. Upload ke Cloud Firestore agar langsung terbaca di device pengguna lain
     _uploadReviewToCloud(newReview).catchError((err) {
       debugPrint('[ReviewSyncService] Cloud upload warning (will retry later): $err');
       return null;
@@ -106,54 +160,61 @@ class ReviewSyncService {
     return newReview;
   }
 
-  /// Uploads a single review to the cloud database
+  /// Mengunggah dokumen ulasan ke Cloud Firestore
   Future<void> _uploadReviewToCloud(ReviewModel review) async {
-    final payload = {
-      'name': 'nara_review:${review.spotId}',
-      'data': review.toJson(),
-    };
+    try {
+      final docId = review.id;
+      final Map<String, dynamic> data = review.toJson();
+      data['firebaseUid'] = _currentUserId;
+      data['createdAt'] = Timestamp.fromDate(review.createdAt);
+      data['updatedAt'] = FieldValue.serverTimestamp();
 
-    final response = await http.post(
-      Uri.parse(_cloudApiBaseUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(payload),
-    ).timeout(_timeout);
+      await _reviewsCollection.doc(docId).set(data, SetOptions(merge: true));
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
       final updated = review.copyWith(isSynced: true);
       await DatabaseHelper.instance.reviewDao.saveReview(updated);
-      debugPrint('[ReviewSyncService] Successfully synced review ${review.id} to cloud');
+      debugPrint(
+        '[ReviewSyncService] Ulasan ${review.id} berhasil disinkronkan ke Cloud Firestore.',
+      );
+    } catch (e) {
+      debugPrint('[ReviewSyncService] Gagal simpan ulasan ke Firestore: $e');
     }
   }
 
-  /// Fetches reviews from Cloud for a specific spot
+  /// Mengambil dokumen ulasan dari Cloud Firestore berdasarkan spotId
   Future<List<ReviewModel>> _fetchReviewsFromCloud(String cleanSpotId) async {
-    // We can query the objects from the REST API
     try {
-      // In restful-api.dev or cloud REST, objects can be fetched
-      final response = await http.get(
-        Uri.parse('$_cloudApiBaseUrl?name=nara_review:$cleanSpotId'),
-      ).timeout(_timeout);
+      final snapshot = await _reviewsCollection
+          .where('spotId', isEqualTo: cleanSpotId)
+          .get();
 
-      if (response.statusCode == 200) {
-        final dynamic body = jsonDecode(response.body);
-        if (body is List) {
-          final List<ReviewModel> result = [];
-          for (final item in body) {
-            if (item is Map<String, dynamic> && item['data'] is Map<String, dynamic>) {
-              try {
-                final rev = ReviewModel.fromJson(Map<String, dynamic>.from(item['data']));
-                if (rev.spotId == cleanSpotId || ReviewDao.normalizeSpotId(rev.destinationName) == cleanSpotId) {
-                  result.add(rev);
-                }
-              } catch (_) {}
-            }
-          }
-          return result;
-        }
+      final List<ReviewModel> result = [];
+      for (final doc in snapshot.docs) {
+        try {
+          final data = doc.data();
+          result.add(ReviewModel.fromJson(data));
+        } catch (_) {}
       }
-    } catch (_) {}
+      return result;
+    } catch (e) {
+      debugPrint('[ReviewSyncService] Gagal fetch review dari Firestore: $e');
+      return [];
+    }
+  }
 
-    return [];
+  // =========================================================================
+  // 3. LIKE & SINKRONISASI DUA ARAH
+  // =========================================================================
+
+  /// Mengirim like/apresiasi ulasan ke Cloud Firestore
+  Future<void> likeReview(String reviewId) async {
+    try {
+      await _reviewsCollection.doc(reviewId).update({
+        'likes': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('[ReviewSyncService] Gagal like ulasan di Firestore: $e');
+    }
   }
 }

@@ -7,6 +7,7 @@ import 'package:flutter_application_1/core/database/tables/database_tables.dart'
 import 'package:flutter_application_1/features/auth/models/user_model.dart';
 import 'package:flutter_application_1/features/map/models/bookmark_model.dart';
 import 'package:flutter_application_1/features/profile/models/expedition_log_model.dart';
+import 'package:flutter_application_1/core/services/expedition_firestore_service.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 
@@ -263,6 +264,10 @@ class DatabaseHelper {
     await database;
     final id = await _expeditionLogDao.saveExpeditionLog(log);
     await syncUserStatsFromLogs(log.userId);
+    // Sinkronisasi otomatis ke Cloud Firestore di latar belakang
+    try {
+      ExpeditionFirestoreService.instance.saveExpeditionLogToCloud(log);
+    } catch (_) {}
     return id;
   }
 

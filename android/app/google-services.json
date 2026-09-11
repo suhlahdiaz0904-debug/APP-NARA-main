@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "546125933045",
+    "project_id": "nara-524a9",
+    "storage_bucket": "nara-524a9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:546125933045:android:c7cb7955a341384da558bc",
+        "android_client_info": {
+          "package_name": "com.suhlah.nara"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxl5CSNkFqminP2PGAc1j6lllVwMmdTxE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

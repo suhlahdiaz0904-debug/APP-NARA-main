@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_application_1/core/services/safety_firestore_service.dart';
 
 // =========================================================================
 // HALAMAN SOS AKTIF (STITCH GOOGLE NARA EMERGENCY BROADCAST)
@@ -10,11 +13,13 @@ import 'package:geolocator/geolocator.dart';
 class SosAktifPage extends StatefulWidget {
   final String? initialCoordinates;
   final String? initialAltitude;
+  final String? initialAlertId;
 
   const SosAktifPage({
     super.key,
     this.initialCoordinates,
     this.initialAltitude,
+    this.initialAlertId,
   });
 
   @override
@@ -43,6 +48,15 @@ class _SosAktifPageState extends State<SosAktifPage>
 
   String _currentCoordsText = '-6.83960° S, 107.45240° E';
   String _currentAltitudeText = '450 m ASL';
+  double _currentLat = -6.8396;
+  double _currentLon = 107.4524;
+
+  // Firebase Firestore State
+  String _alertId = '';
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _alertDocSubscription;
+  StreamSubscription<Position>? _positionStreamSubscription;
+  final List<Map<String, dynamic>> _responders = [];
+  bool _isFirebaseSynced = false;
 
   @override
   void initState() {
@@ -55,8 +69,12 @@ class _SosAktifPageState extends State<SosAktifPage>
     if (widget.initialAltitude != null && widget.initialAltitude!.isNotEmpty) {
       _currentAltitudeText = widget.initialAltitude!;
     }
+    if (widget.initialAlertId != null && widget.initialAlertId!.isNotEmpty) {
+      _alertId = widget.initialAlertId!;
+    }
 
-    _fetchCurrentGps();
+    _initFirebaseSosBroadcast();
+    _fetchCurrentGpsAndTrack();
 
     // Animasi Denyut Bertingkat (Triple Pulse Layer)
     _pulseController1 = AnimationController(
@@ -91,7 +109,48 @@ class _SosAktifPageState extends State<SosAktifPage>
       });
   }
 
-  Future<void> _fetchCurrentGps() async {
+  /// Mempublikasikan sinyal SOS ke Firebase Firestore secara Real-Time
+  Future<void> _initFirebaseSosBroadcast() async {
+    try {
+      if (_alertId.isEmpty) {
+        _alertId = await SafetyFirestoreService.instance.publishSosAlert(
+          latitude: _currentLat,
+          longitude: _currentLon,
+          altitude: _currentAltitudeText,
+        );
+      }
+
+      if (_alertId.isNotEmpty) {
+        if (mounted) {
+          setState(() => _isFirebaseSynced = true);
+        }
+
+        // Listen update respon dari rekan tim pada dokumen Firestore
+        _alertDocSubscription = FirebaseFirestore.instance
+            .collection('nara_sos_alerts')
+            .doc(_alertId)
+            .snapshots()
+            .listen((snapshot) {
+          if (snapshot.exists && snapshot.data() != null && mounted) {
+            final data = snapshot.data()!;
+            final rawResponders = data['responders'] as List?;
+            if (rawResponders != null) {
+              setState(() {
+                _responders
+                  ..clear()
+                  ..addAll(
+                    rawResponders
+                        .map((r) => Map<String, dynamic>.from(r as Map)),
+                  );
+              });
+            }
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchCurrentGpsAndTrack() async {
     try {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -99,23 +158,47 @@ class _SosAktifPageState extends State<SosAktifPage>
           timeLimit: Duration(seconds: 10),
         ),
       );
-      if (mounted) {
-        setState(() {
-          final latFormatted = pos.latitude < 0
-              ? '${pos.latitude.abs().toStringAsFixed(6)}° S'
-              : '${pos.latitude.toStringAsFixed(6)}° N';
-          final lonFormatted = pos.longitude < 0
-              ? '${pos.longitude.abs().toStringAsFixed(6)}° W'
-              : '${pos.longitude.toStringAsFixed(6)}° E';
-          _currentCoordsText = '$latFormatted, $lonFormatted';
-          _currentAltitudeText = '${pos.altitude.round()} m ASL';
-        });
-      }
+      _updatePosition(pos);
+
+      // Start Realtime GPS Position Stream
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 5,
+        ),
+      ).listen(_updatePosition);
     } catch (_) {}
+  }
+
+  void _updatePosition(Position pos) {
+    if (!mounted) return;
+    setState(() {
+      _currentLat = pos.latitude;
+      _currentLon = pos.longitude;
+      final latFormatted = pos.latitude < 0
+          ? '${pos.latitude.abs().toStringAsFixed(6)}° S'
+          : '${pos.latitude.toStringAsFixed(6)}° N';
+      final lonFormatted = pos.longitude < 0
+          ? '${pos.longitude.abs().toStringAsFixed(6)}° W'
+          : '${pos.longitude.toStringAsFixed(6)}° E';
+      _currentCoordsText = '$latFormatted, $lonFormatted';
+      _currentAltitudeText = '${pos.altitude.round()} m ASL';
+    });
+
+    if (_alertId.isNotEmpty) {
+      SafetyFirestoreService.instance.updateSosLocation(
+        _alertId,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        altitude: '${pos.altitude.round()} m ASL',
+      );
+    }
   }
 
   @override
   void dispose() {
+    _alertDocSubscription?.cancel();
+    _positionStreamSubscription?.cancel();
     _pulseController1.dispose();
     _pulseController2.dispose();
     _pulseController3.dispose();
@@ -137,9 +220,20 @@ class _SosAktifPageState extends State<SosAktifPage>
     setState(() => _isHoldingCancel = false);
   }
 
-  void _cancelSosAndExit() {
+  Future<void> _cancelSosAndExit() async {
     HapticFeedback.mediumImpact();
-    Navigator.pop(context, true); // Return true indicating cancelled
+    // Batalkan di Firebase Firestore
+    if (_alertId.isNotEmpty) {
+      await SafetyFirestoreService.instance.cancelSosAlert(
+        _alertId,
+        latitude: _currentLat,
+        longitude: _currentLon,
+        altitude: _currentAltitudeText,
+      );
+    }
+    if (mounted) {
+      Navigator.pop(context, true); // Return true indicating cancelled
+    }
   }
 
   @override
@@ -377,9 +471,91 @@ class _SosAktifPageState extends State<SosAktifPage>
                                 ),
                               ],
                             ),
+                            if (_isFirebaseSynced) ...[
+                              const SizedBox(height: 12),
+                              Divider(color: Colors.white.withValues(alpha: 0.1), height: 1),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF4CAF50),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text(
+                                        'Cloud Firestore Live Broadcast',
+                                        style: TextStyle(
+                                          color: textDim,
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    _alertId.isNotEmpty ? 'ID: ${_alertId.substring(0, _alertId.length > 6 ? 6 : _alertId.length)}' : 'Tersinkron',
+                                    style: const TextStyle(
+                                      color: textSecondary,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
+                      if (_responders.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E382B),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFF4CAF50), width: 1.5),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.support_agent_rounded, color: Color(0xFFC5ECD2), size: 22),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${_responders.length} Rekan Tim Menanggapi SOS!',
+                                      style: const TextStyle(
+                                        color: Color(0xFFC5ECD2),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Text(
+                                      _responders.map((r) => r['name'] ?? 'Rekan').join(', '),
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

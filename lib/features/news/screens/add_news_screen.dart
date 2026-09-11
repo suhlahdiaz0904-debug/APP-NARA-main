@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_application_1/features/news/models/news_model.dart';
 import 'package:flutter_application_1/core/theme/theme_provider.dart';
+import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:geolocator/geolocator.dart';
 
 class PhotoMetadata {
@@ -465,6 +466,16 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
         ? 'Batu Gamping / Karst'
         : 'Jalur Hutan Tropis';
 
+    String authorName = 'Farhiyah';
+    int? activeUid;
+    try {
+      final activeUser = await DatabaseHelper.instance.getLatestUser();
+      if (activeUser != null && activeUser.nama.isNotEmpty) {
+        authorName = activeUser.nama;
+        activeUid = activeUser.id;
+      }
+    } catch (_) {}
+
     final uploadedAt = DateTime.now();
     final newBerita = BeritaModel(
       id: 'berita_${uploadedAt.millisecondsSinceEpoch}',
@@ -484,13 +495,14 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
       rockType: rockType,
       grade: 'Grade 5.9',
       rating: '5.0',
-      author: 'Farhiyah',
+      author: authorName,
       duration: '1 Hari',
       team: '1 Tim',
       elevation: '125 mdpl',
       technique: 'Single Rope Technique (SRT), Lead Climbing',
       mainRope: 'Dynamic Rope 10mm (60m)',
       isDraft: false,
+      userId: activeUid,
       status: 'PENDING',
     );
 
@@ -498,7 +510,7 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
 
     scaffoldMessenger.showSnackBar(
       SnackBar(
-        content: Text('Laporan terbit (PENDING ACC) - Koordinat: $gpsCoordinates'),
+        content: Text('Laporan terbit & tersinkron ke Cloud Firestore! - Koordinat: $gpsCoordinates'),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 4),
       ),

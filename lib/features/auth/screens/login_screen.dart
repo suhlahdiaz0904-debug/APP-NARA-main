@@ -6,6 +6,8 @@ import 'package:flutter_application_1/features/home/screens/home_screen.dart';
 import 'package:flutter_application_1/features/auth/screens/register_screen.dart';
 import 'package:flutter_application_1/features/profile/screens/privacy_policy_screen.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
+import 'package:flutter_application_1/core/services/auth_service.dart';
+import 'package:flutter_application_1/core/widgets/google_sign_in_button.dart';
 
 class Tugas12LoginPage extends StatefulWidget {
   const Tugas12LoginPage({super.key});
@@ -21,6 +23,7 @@ class _Tugas12LoginPageState extends State<Tugas12LoginPage> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
@@ -29,18 +32,89 @@ class _Tugas12LoginPageState extends State<Tugas12LoginPage> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      final user = await DatabaseHelper.instance.loginUser(email, password);
+      try {
+        await AuthService.instance.signInWithEmailPassword(
+          email: email,
+          password: password,
+        );
 
-      setState(() => _isLoading = false);
+        final activeUser = await DatabaseHelper.instance.getLatestUser();
+        final displayName = activeUser?.nama ?? 'Petualang';
 
-      if (!mounted) return;
-
-      if (user != null) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Selamat Datang Kembali, ${user.nama}!',
+              'Selamat Datang Kembali, $displayName!',
             ),
+            backgroundColor: const Color(0xFF2D5A43),
+          ),
+        );
+
+        // Masuk langsung ke Home Page NARA
+        await Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const NaraApp()),
+          (route) => false,
+        );
+      } catch (e) {
+        // Coba login via SQLite lokal (dukungan offline)
+        final localUser = await DatabaseHelper.instance.loginUser(email, password);
+        if (localUser != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Masuk Mode Offline (Lokal), Selamat Datang Kembali, ${localUser.nama}!',
+              ),
+              backgroundColor: const Color(0xFF2D5A43),
+            ),
+          );
+
+          await Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const NaraApp()),
+            (route) => false,
+          );
+          return;
+        }
+
+        if (!mounted) return;
+        String errorMessage = 'Email atau Password salah / belum terdaftar!';
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('user-not-found') || errStr.contains('invalid-credential')) {
+          errorMessage = 'Email atau Kata Sandi salah / akun belum terdaftar!';
+        } else if (errStr.contains('wrong-password')) {
+          errorMessage = 'Kata sandi yang dimasukkan salah!';
+        } else if (errStr.contains('invalid-email')) {
+          errorMessage = 'Format email tidak valid!';
+        } else if (errStr.contains('user-disabled')) {
+          errorMessage = 'Akun ini telah dinonaktifkan sementara.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppTheme.errorRed,
+          ),
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _handleGoogleSignIn() async {
+    setState(() => _isGoogleLoading = true);
+    try {
+      final userCredential = await AuthService.instance.signInWithGoogle();
+      if (!mounted) return;
+
+      if (userCredential != null) {
+        final displayName =
+            userCredential.user?.displayName ?? 'Petualang NARA';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selamat Datang Kembali, $displayName!'),
             backgroundColor: const Color(0xFF2D5A43),
           ),
         );
@@ -51,14 +125,17 @@ class _Tugas12LoginPageState extends State<Tugas12LoginPage> {
           MaterialPageRoute(builder: (context) => const NaraApp()),
           (route) => false,
         );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email atau Password salah / belum terdaftar!'),
-            backgroundColor: AppTheme.errorRed,
-          ),
-        );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal Masuk dengan Google: ${e.toString()}'),
+          backgroundColor: AppTheme.errorRed,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -177,7 +254,11 @@ class _Tugas12LoginPageState extends State<Tugas12LoginPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildLogoHeader(),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 22),
+                      _buildGoogleSignInBar(),
+                      const SizedBox(height: 18),
+                      _buildDividerWithText('ATAU MASUK DENGAN EMAIL'),
+                      const SizedBox(height: 18),
                       _buildEmailField(),
                       const SizedBox(height: 14),
                       _buildPasswordField(),
@@ -196,6 +277,45 @@ class _Tugas12LoginPageState extends State<Tugas12LoginPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildGoogleSignInBar() {
+    return GoogleSignInButton(
+      label: 'Masuk dengan Google',
+      isLoading: _isGoogleLoading,
+      onPressed: _isLoading || _isGoogleLoading ? null : _handleGoogleSignIn,
+    );
+  }
+
+  Widget _buildDividerWithText(String text) {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(
+            color: Colors.white.withValues(alpha: 0.22),
+            thickness: 0.8,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            text,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(
+            color: Colors.white.withValues(alpha: 0.22),
+            thickness: 0.8,
+          ),
+        ),
+      ],
     );
   }
 
@@ -345,7 +465,7 @@ class _Tugas12LoginPageState extends State<Tugas12LoginPage> {
     return SizedBox(
       height: 52,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleLogin,
+        onPressed: _isLoading || _isGoogleLoading ? null : _handleLogin,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF2D5A43),
           foregroundColor: Colors.white,

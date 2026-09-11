@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:flutter_application_1/features/auth/models/user_model.dart';
+import 'package:flutter_application_1/core/services/auth_service.dart';
 
 // =========================================================================
 // HALAMAN SETUP AKUN AWAL & EDIT PROFIL PETUALANG NARA
@@ -334,6 +335,9 @@ class _SetupAkunPageState extends State<SetupAkunPage> {
       try {
         await DatabaseHelper.instance.updateUser(updatedUser);
         await DatabaseHelper.instance.syncUserStatsFromLogs(updatedUser.id);
+
+        // Sinkronisasi otomatis ke Cloud Firestore (nara_user_profiles)
+        AuthService.instance.syncUserProfileToFirestore(updatedUser);
 
         if (!mounted) return;
 

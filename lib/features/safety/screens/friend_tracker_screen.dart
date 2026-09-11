@@ -8,9 +8,10 @@ import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/features/map/screens/interactive_map_screen.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:flutter_application_1/features/auth/models/user_model.dart';
+import 'package:flutter_application_1/core/services/safety_firestore_service.dart';
 
 // =========================================================================
-// HALAMAN DETAIL PELACAK TEMAN LURING (POV PEMANJAT & SOS RECEIVED)
+// HALAMAN DETAIL PELACAK TEMAN LURING & CLOUD (POV PEMANJAT & SOS RECEIVED)
 // Berdasarkan Desain Stitch Google: 255a660ea9b6449db49180091ee1dbe3
 // =========================================================================
 
@@ -39,18 +40,32 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
   bool _hasSosDistress = true;
   bool _showIncomingNotification = true;
 
+  // Data Korban SOS Real-Time (Dinamis dari Firebase Firestore / Fallback Simulasi)
+  String _activeSosAlertId = '';
+  String _sosVictimName = 'Ayu';
+  String _sosVictimElevation = '2,840 m';
+  String _sosVictimBattery = '18%';
+  String _sosDistLabel = '1.2 km';
+  String _sosTimeLabel = '3 mins ago';
+
   // Titik Koordinat GPS (Device Pengguna & Korban / Anggota Tim)
   LatLng _userDeviceLocation = const LatLng(-6.8410, 107.4535);
-  final LatLng _ayuSosLocation = const LatLng(-6.8360, 107.4490);
+  LatLng _activeSosLocation = const LatLng(-6.8360, 107.4490);
 
   // Data Anggota Berstatus Normal di Sekitar Pemanjat
   final List<Map<String, dynamic>> _normalMembers = [];
+
+  // Firebase Firestore Subscriptions
+  StreamSubscription? _liveTrackersSubscription;
+  StreamSubscription? _activeSosSubscription;
+  bool _isUsingFirebaseSos = false;
 
   @override
   void initState() {
     super.initState();
 
     _fetchUserRealGps();
+    _initFirebaseTrackingStreams();
 
     // Animasi Double Pulse SOS Marker
     _sosPulseController1 = AnimationController(
@@ -76,6 +91,114 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
     HapticFeedback.heavyImpact();
   }
 
+  void _initFirebaseTrackingStreams() {
+    // 1. Listen Live Trackers dari Firestore
+    _liveTrackersSubscription = SafetyFirestoreService.instance
+        .getLiveTrackersStream()
+        .listen((trackers) {
+      if (!mounted) return;
+      _updateNormalMembersFromFirestore(trackers);
+    });
+
+    // 2. Listen Active SOS Distress Alerts dari Firestore
+    _activeSosSubscription = SafetyFirestoreService.instance
+        .getActiveSosAlertsStream()
+        .listen((alerts) {
+      if (!mounted) return;
+      final currentUid = SafetyFirestoreService.instance.currentUserId;
+      final otherAlerts = alerts.where((a) => a['userId'] != currentUid).toList();
+
+      if (otherAlerts.isNotEmpty) {
+        final latestSos = otherAlerts.first;
+        final lat = (latestSos['latitude'] as num?)?.toDouble() ?? _activeSosLocation.latitude;
+        final lon = (latestSos['longitude'] as num?)?.toDouble() ?? _activeSosLocation.longitude;
+        final distMeters = Geolocator.distanceBetween(
+          _userDeviceLocation.latitude,
+          _userDeviceLocation.longitude,
+          lat,
+          lon,
+        ).round();
+
+        setState(() {
+          _isUsingFirebaseSos = true;
+          _hasSosDistress = true;
+          _showIncomingNotification = true;
+          _activeSosAlertId = latestSos['id'] ?? '';
+          _sosVictimName = latestSos['userName'] ?? 'Rekan NARA';
+          _sosVictimElevation = latestSos['altitude'] ?? '2,840 m';
+          _sosVictimBattery = '${latestSos['battery'] ?? 18}%';
+          _activeSosLocation = LatLng(lat, lon);
+          _sosDistLabel = distMeters < 1000 ? '$distMeters m' : '${(distMeters / 1000).toStringAsFixed(1)} km';
+          _sosTimeLabel = 'Live Firebase';
+        });
+        _bannerSlideController.forward(from: 0.0);
+      } else if (_isUsingFirebaseSos) {
+        setState(() {
+          _isUsingFirebaseSos = false;
+          _hasSosDistress = false;
+          _showIncomingNotification = false;
+          _activeSosAlertId = '';
+        });
+      }
+    });
+  }
+
+  void _updateNormalMembersFromFirestore(List<Map<String, dynamic>> trackers) {
+    final currentUid = SafetyFirestoreService.instance.currentUserId;
+    final validTrackers = trackers
+        .where((t) => t['userId'] != currentUid && (t['latitude'] != 0.0 || t['longitude'] != 0.0) && t['status'] != 'sos')
+        .toList();
+
+    if (validTrackers.isNotEmpty) {
+      final List<Map<String, dynamic>> result = [];
+      for (int i = 0; i < validTrackers.length && i < 6; i++) {
+        final t = validTrackers[i];
+        final lat = t['latitude'] as double;
+        final lon = t['longitude'] as double;
+        final memberLocation = LatLng(lat, lon);
+
+        final distanceMeters = Geolocator.distanceBetween(
+          _userDeviceLocation.latitude,
+          _userDeviceLocation.longitude,
+          lat,
+          lon,
+        ).round();
+
+        final distanceLabel = distanceMeters < 1000
+            ? '$distanceMeters m away'
+            : '${(distanceMeters / 1000).toStringAsFixed(1)} km away';
+
+        final name = (t['userName'] as String? ?? 'Petualang').trim();
+        final initials = name
+            .split(RegExp(r'\s+'))
+            .where((v) => v.isNotEmpty)
+            .map((v) => v[0].toUpperCase())
+            .take(2)
+            .join();
+
+        result.add({
+          'initial': initials.isEmpty ? 'U' : initials,
+          'name': name,
+          'distance': distanceLabel,
+          'elevation': t['altitude'] ?? 'Elev ${2600 + i * 90} m',
+          'battery': '${t['battery'] ?? (82 - i * 7)}%',
+          'batteryIcon': i % 2 == 0
+              ? Icons.battery_full_rounded
+              : Icons.battery_5_bar_rounded,
+          'location': memberLocation,
+        });
+      }
+
+      setState(() {
+        _normalMembers
+          ..clear()
+          ..addAll(result);
+      });
+    } else {
+      _loadDetectedUsers();
+    }
+  }
+
   Future<void> _fetchUserRealGps() async {
     try {
       final pos = await Geolocator.getCurrentPosition(
@@ -88,6 +211,12 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
         setState(() {
           _userDeviceLocation = LatLng(pos.latitude, pos.longitude);
         });
+        // Broadcast lokasi ke Firestore
+        SafetyFirestoreService.instance.broadcastUserLocation(
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          altitude: '${pos.altitude.round()} m ASL',
+        );
         await _loadDetectedUsers();
       }
     } catch (_) {
@@ -174,6 +303,8 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
 
   @override
   void dispose() {
+    _liveTrackersSubscription?.cancel();
+    _activeSosSubscription?.cancel();
     _sosPulseController1.dispose();
     _sosPulseController2.dispose();
     _bannerSlideController.dispose();
@@ -198,16 +329,26 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
 
   void _kirimPingRespon() {
     HapticFeedback.heavyImpact();
+
+    // Kirim konfirmasi respon ke Firebase Firestore jika alertId ada
+    if (_activeSosAlertId.isNotEmpty) {
+      SafetyFirestoreService.instance.sendSosResponsePing(
+        alertId: _activeSosAlertId,
+        responderLat: _userDeviceLocation.latitude,
+        responderLng: _userDeviceLocation.longitude,
+      );
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Row(
+        content: Row(
           children: [
-            Icon(Icons.cell_tower_rounded, color: accentAmber, size: 20),
-            SizedBox(width: 10),
+            const Icon(Icons.cell_tower_rounded, color: accentAmber, size: 20),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Sinyal Respon & Konfirmasi Pertolongan telah dikirimkan ke device Ayu.',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                'Sinyal Respon & Konfirmasi Pertolongan telah dikirimkan ke device $_sosVictimName melalui Firebase & Satelit Iridium.',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -222,15 +363,15 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
 
   @override
   Widget build(BuildContext context) {
-    // Garis Rute Penyelamatan dari Device User ke Device Ayu (SOS)
+    // Garis Rute Penyelamatan dari Device User ke Device Korban (SOS)
     final List<LatLng> rescueRoutePoints = [
       _userDeviceLocation,
       LatLng(
-        (_userDeviceLocation.latitude + _ayuSosLocation.latitude) / 2 + 0.001,
-        (_userDeviceLocation.longitude + _ayuSosLocation.longitude) / 2 -
+        (_userDeviceLocation.latitude + _activeSosLocation.latitude) / 2 + 0.001,
+        (_userDeviceLocation.longitude + _activeSosLocation.longitude) / 2 -
             0.0015,
       ),
-      _ayuSosLocation,
+      _activeSosLocation,
     ];
 
     final bool isDark = context.isDarkMode;
@@ -257,7 +398,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
               ),
             ),
             Text(
-              'PELACAK TEMAN (LURING)',
+              'PELACAK TEMAN (LURING & CLOUD)',
               style: TextStyle(
                 color: context.themeTextSecondary,
                 fontWeight: FontWeight.bold,
@@ -329,7 +470,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                       FlutterMap(
                         mapController: _mapController,
                         options: MapOptions(
-                          initialCenter: _ayuSosLocation,
+                          initialCenter: _hasSosDistress ? _activeSosLocation : _userDeviceLocation,
                           initialZoom: 14.5,
                           interactionOptions: const InteractionOptions(
                             flags: InteractiveFlag.all,
@@ -344,7 +485,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                             maxZoom: 18,
                           ),
 
-                          // Garis Rute Penyelamatan Merah ke Device Ayu
+                          // Garis Rute Penyelamatan Merah ke Device Korban SOS
                           if (_hasSosDistress)
                             PolylineLayer(
                               polylines: [
@@ -424,10 +565,10 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                 ),
                               ),
 
-                              // 2. Marker Rekan SOS (Ayu) dengan Efek Double Pulse Ring
+                              // 2. Marker Rekan SOS dengan Efek Double Pulse Ring
                               if (_hasSosDistress)
                                 Marker(
-                                  point: _ayuSosLocation,
+                                  point: _activeSosLocation,
                                   width: 140,
                                   height: 100,
                                   child: Column(
@@ -494,20 +635,22 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                             ),
                                           ],
                                         ),
-                                        child: const Column(
+                                        child: Column(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
-                                              'Ayu (SOS)',
-                                              style: TextStyle(
+                                              '$_sosVictimName (SOS)',
+                                              style: const TextStyle(
                                                 fontSize: 10.5,
                                                 fontWeight: FontWeight.w900,
                                                 color: errorRed,
                                               ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                             Text(
-                                              '1.2 km • 3 min',
-                                              style: TextStyle(
+                                              '$_sosDistLabel • Live GPS',
+                                              style: const TextStyle(
                                                 fontSize: 8.5,
                                                 fontWeight: FontWeight.w600,
                                                 color: darkGreen,
@@ -520,7 +663,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                   ),
                                 ),
 
-                              // 3. Markers Anggota Tim Normal (Alex, Maya, Sarah)
+                              // 3. Markers Anggota Tim Normal
                               ..._normalMembers.map((member) {
                                 final LatLng loc = member['location'] as LatLng;
                                 return Marker(
@@ -592,7 +735,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                         ],
                       ),
 
-                      // Overlay Badge Status Luring di Pojok Kiri Atas Peta
+                      // Overlay Badge Status Luring / Cloud di Pojok Kiri Atas Peta
                       Positioned(
                         top: 12,
                         left: 14,
@@ -608,18 +751,20 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                               BoxShadow(color: Colors.black12, blurRadius: 4),
                             ],
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.satellite_alt_rounded,
-                                color: errorRed,
+                                color: _hasSosDistress ? errorRed : const Color(0xFF2E7D32),
                                 size: 14,
                               ),
-                              SizedBox(width: 4),
+                              const SizedBox(width: 4),
                               Text(
-                                'Luring (LoRa Mesh 915 MHz)',
-                                style: TextStyle(
+                                _isUsingFirebaseSos
+                                    ? 'Cloud & Mesh 915 MHz Active'
+                                    : 'Luring (LoRa Mesh 915 MHz)',
+                                style: const TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
                                   color: darkGreen,
@@ -696,10 +841,12 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                       color: errorRed,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Center(
+                                    child: Center(
                                       child: Text(
-                                        'A',
-                                        style: TextStyle(
+                                        _sosVictimName.isNotEmpty
+                                            ? _sosVictimName[0].toUpperCase()
+                                            : 'A',
+                                        style: const TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.w900,
                                           color: Colors.white,
@@ -714,7 +861,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Ayu',
+                                          _sosVictimName,
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.w900,
@@ -759,11 +906,11 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                       ],
                                     ),
                                   ),
-                                  const Column(
+                                  Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      Text(
-                                        'Updated',
+                                      const Text(
+                                        'Status',
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
@@ -771,8 +918,8 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                         ),
                                       ),
                                       Text(
-                                        '3 mins ago',
-                                        style: TextStyle(
+                                        _sosTimeLabel,
+                                        style: const TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                           color: errorRed,
@@ -792,7 +939,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                     child: _buildDistressMetricBox(
                                       icon: Icons.straighten_rounded,
                                       label: 'Dist',
-                                      value: '1.2 km',
+                                      value: _sosDistLabel,
                                       isRed: false,
                                     ),
                                   ),
@@ -803,7 +950,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                     child: _buildDistressMetricBox(
                                       icon: Icons.landscape_rounded,
                                       label: 'Elev',
-                                      value: '2,840 m',
+                                      value: _sosVictimElevation,
                                       isRed: false,
                                     ),
                                   ),
@@ -814,7 +961,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                     child: _buildDistressMetricBox(
                                       icon: Icons.battery_2_bar_rounded,
                                       label: 'Batt',
-                                      value: '18%',
+                                      value: _sosVictimBattery,
                                       isRed: true,
                                     ),
                                   ),
@@ -829,8 +976,8 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                   Expanded(
                                     child: ElevatedButton.icon(
                                       onPressed: () => _navigasiRuteKeDevice(
-                                        'Ayu (SOS)',
-                                        _ayuSosLocation,
+                                        '$_sosVictimName (SOS)',
+                                        _activeSosLocation,
                                       ),
                                       icon: Icon(
                                         Icons.route_rounded,
@@ -1095,9 +1242,9 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            const Text(
-                              'Ayu memicu sinyal darurat (1.2 km dari lokasi Anda)',
-                              style: TextStyle(
+                            Text(
+                              '$_sosVictimName memicu sinyal darurat ($_sosDistLabel dari lokasi Anda)',
+                              style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 10,
                               ),
@@ -1109,7 +1256,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
                       ),
                       TextButton(
                         onPressed: () {
-                          _navigasiRuteKeDevice('Ayu (SOS)', _ayuSosLocation);
+                          _navigasiRuteKeDevice('$_sosVictimName (SOS)', _activeSosLocation);
                         },
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 8),

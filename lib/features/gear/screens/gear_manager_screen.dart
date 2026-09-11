@@ -1,4 +1,6 @@
+// ignore_for_file: non_const_argument_for_const_parameter
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/services/gear_firestore_service.dart';
 
 // =========================================================================
 // MODEL & KNOWLEDGE BASE PERAWATAN ALAT GOA & TEBING (NARA OUTDOOR)
@@ -77,11 +79,42 @@ class GearItem {
       'categoryId': categoryId,
       'title': title,
       'subtitle': subtitle,
-      'icon': icon,
+      'iconCodePoint': icon.codePoint,
+      'iconFontFamily': icon.fontFamily,
       'isReady': isReady,
-      'lastMaintenanceDate': lastMaintenanceDate,
+      'lastMaintenanceDate': lastMaintenanceDate?.toIso8601String(),
       'lastMaintenanceNote': lastMaintenanceNote,
     };
+  }
+
+  factory GearItem.fromMap(Map<String, dynamic> map) {
+    IconData itemIcon = Icons.shield_outlined;
+    if (map['iconCodePoint'] != null) {
+      itemIcon = IconData(
+        map['iconCodePoint'] as int,
+        fontFamily: map['iconFontFamily'] as String? ?? 'MaterialIcons',
+      );
+    }
+
+    DateTime? parsedDate;
+    if (map['lastMaintenanceDate'] != null) {
+      if (map['lastMaintenanceDate'] is String) {
+        parsedDate = DateTime.tryParse(map['lastMaintenanceDate'] as String);
+      } else if (map['lastMaintenanceDate'] is DateTime) {
+        parsedDate = map['lastMaintenanceDate'] as DateTime;
+      }
+    }
+
+    return GearItem(
+      id: map['id']?.toString() ?? 'gear_${DateTime.now().millisecondsSinceEpoch}',
+      categoryId: map['categoryId']?.toString() ?? 'tali_keamanan',
+      title: map['title']?.toString() ?? 'Alat Petualang',
+      subtitle: map['subtitle']?.toString() ?? 'Siap Digunakan',
+      icon: itemIcon,
+      isReady: map['isReady'] == true,
+      lastMaintenanceDate: parsedDate,
+      lastMaintenanceNote: map['lastMaintenanceNote']?.toString(),
+    );
   }
 }
 
@@ -99,10 +132,44 @@ class GearCategory {
     required this.description,
     required this.items,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'iconCodePoint': icon.codePoint,
+      'iconFontFamily': icon.fontFamily,
+      'description': description,
+      'items': items.map((i) => i.toMap()).toList(),
+    };
+  }
+
+  factory GearCategory.fromMap(Map<String, dynamic> map) {
+    IconData catIcon = Icons.category_rounded;
+    if (map['iconCodePoint'] != null) {
+      catIcon = IconData(
+        map['iconCodePoint'] as int,
+        fontFamily: map['iconFontFamily'] as String? ?? 'MaterialIcons',
+      );
+    }
+
+    final rawItems = map['items'] as List? ?? [];
+    final itemsList = rawItems
+        .map((i) => GearItem.fromMap(Map<String, dynamic>.from(i as Map)))
+        .toList();
+
+    return GearCategory(
+      id: map['id']?.toString() ?? 'cat_${DateTime.now().millisecondsSinceEpoch}',
+      title: map['title']?.toString() ?? 'Kategori',
+      icon: catIcon,
+      description: map['description']?.toString() ?? '',
+      items: itemsList,
+    );
+  }
 }
 
 // =========================================================================
-// CENTRAL GEAR MANAGER & SYNC SERVICE (SINGLETON + VALUE NOTIFIER)
+// CENTRAL GEAR MANAGER & FIREBASE SYNC ENGINE (SINGLETON + VALUE NOTIFIER)
 // =========================================================================
 
 class GearManager extends ChangeNotifier {
@@ -111,6 +178,8 @@ class GearManager extends ChangeNotifier {
 
   GearManager._internal() {
     _initDefaultData();
+    // Inisialisasi sinkronisasi cloud Firebase di latar belakang
+    syncFromFirestore();
   }
 
   static GearManager get instance => _instance;
@@ -118,6 +187,13 @@ class GearManager extends ChangeNotifier {
   // Master Categories & Items
   final List<GearCategory> _categories = [];
   List<GearCategory> get categories => List.unmodifiable(_categories);
+
+  // Status Sinkronisasi Cloud Firebase
+  bool _isSyncing = false;
+  bool get isSyncing => _isSyncing;
+
+  DateTime? _lastSyncedAt;
+  DateTime? get lastSyncedAt => _lastSyncedAt;
 
   // Fallback static accessor for backward compatibility
   static List<Map<String, dynamic>> get staticCategoriesCompat {
@@ -160,6 +236,32 @@ class GearManager extends ChangeNotifier {
   int get readyGearCount => _calculateReadyCount();
   bool get isAllGearReady => _calculateIsAllReady();
 
+  /// Sinkronisasi penuh dengan Cloud Firestore
+  Future<void> syncFromFirestore() async {
+    _isSyncing = true;
+    notifyListeners();
+
+    try {
+      final cloudCats = await GearFirestoreService.instance.fetchInventory();
+      if (cloudCats != null && cloudCats.isNotEmpty) {
+        _categories.clear();
+        for (final catMap in cloudCats) {
+          _categories.add(GearCategory.fromMap(catMap));
+        }
+        _lastSyncedAt = DateTime.now();
+      } else {
+        // Jika di Firestore belum ada data, inisialisasi awal ke Firestore
+        await GearFirestoreService.instance.saveInventory(_categories);
+        _lastSyncedAt = DateTime.now();
+      }
+    } catch (e) {
+      debugPrint('[GearManager] Cloud sync fallback error: $e');
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
+  }
+
   // Mencari GearItem berdasarkan ID
   GearItem? findItemById(String itemId) {
     for (var cat in _categories) {
@@ -170,7 +272,7 @@ class GearManager extends ChangeNotifier {
     return null;
   }
 
-  // Toggle status kesiapan alat
+  // Toggle status kesiapan alat (Sync ke Firestore)
   void toggleItemStatus(String itemId) {
     final item = findItemById(itemId);
     if (item != null) {
@@ -181,29 +283,48 @@ class GearManager extends ChangeNotifier {
         item.subtitle = 'Belum diverifikasi kelayakannya';
       }
       notifyListeners();
+
+      // Perbarui status alat di Cloud Firestore
+      GearFirestoreService.instance.updateSingleGearItem(item, item.categoryId);
     }
   }
 
-  // Log perawatan baru & tandai alat siap
-  void recordMaintenance(String itemId, {String note = 'Pembersihan & inspeksi berkala selesai dilakukan.'}) {
+  // Log perawatan baru & tandai alat siap (Sync ke Firestore + Catat Log History)
+  void recordMaintenance(
+    String itemId, {
+    String note = 'Pembersihan & inspeksi berkala selesai dilakukan.',
+  }) {
     final item = findItemById(itemId);
     if (item != null) {
       item.isReady = true;
-      item.lastMaintenanceDate = DateTime.now();
+      final now = DateTime.now();
+      item.lastMaintenanceDate = now;
       item.lastMaintenanceNote = note;
-      item.subtitle = 'Selesai dirawat (${_formatDate(DateTime.now())})';
+      item.subtitle = 'Selesai dirawat (${_formatDate(now)})';
       notifyListeners();
+
+      // Sinkronisasi status alat & simpan log ke Firestore
+      GearFirestoreService.instance.updateSingleGearItem(item, item.categoryId);
+      GearFirestoreService.instance.recordMaintenanceLog(
+        itemId: item.id,
+        itemTitle: item.title,
+        categoryId: item.categoryId,
+        note: note,
+        date: now,
+      );
     }
   }
 
-  // Menambah Alat Baru
+  // Menambah Alat Baru (Upload ke Cloud Firestore)
   void addNewGear({
     required String categoryId,
     required String title,
     required String subtitle,
     required bool isReady,
   }) {
-    final catIndex = _categories.indexWhere((c) => c.id == categoryId || c.title == categoryId);
+    final catIndex = _categories.indexWhere(
+      (c) => c.id == categoryId || c.title == categoryId,
+    );
     if (catIndex != -1) {
       final targetCat = _categories[catIndex];
       IconData itemIcon = _resolveIconForNewGear(targetCat.id, title);
@@ -223,30 +344,61 @@ class GearManager extends ChangeNotifier {
 
       targetCat.items.add(newItem);
       notifyListeners();
+
+      // Simpan pembaruan inventaris ke Firestore
+      GearFirestoreService.instance.saveInventory(_categories);
+    }
+  }
+
+  // Menghapus Alat dari Inventaris & Cloud Firestore
+  void deleteGear(String itemId) {
+    for (var cat in _categories) {
+      final index = cat.items.indexWhere((i) => i.id == itemId);
+      if (index != -1) {
+        cat.items.removeAt(index);
+        notifyListeners();
+        GearFirestoreService.instance.deleteGearItem(itemId, cat.id);
+        break;
+      }
     }
   }
 
   IconData _resolveIconForNewGear(String categoryId, String title) {
     final lowerTitle = title.toLowerCase();
-    if (lowerTitle.contains('tali') || lowerTitle.contains('rope') || lowerTitle.contains('sling') || lowerTitle.contains('webbing') || lowerTitle.contains('cowstail')) {
+    if (lowerTitle.contains('tali') ||
+        lowerTitle.contains('rope') ||
+        lowerTitle.contains('sling') ||
+        lowerTitle.contains('webbing') ||
+        lowerTitle.contains('cowstail')) {
       return Icons.link_rounded;
     }
-    if (lowerTitle.contains('harness') || lowerTitle.contains('seat') || lowerTitle.contains('chest')) {
+    if (lowerTitle.contains('harness') ||
+        lowerTitle.contains('seat') ||
+        lowerTitle.contains('chest')) {
       return Icons.accessibility_new_rounded;
     }
     if (lowerTitle.contains('helm') || lowerTitle.contains('helmet')) {
       return Icons.sports_motorsports_rounded;
     }
-    if (lowerTitle.contains('karabiner') || lowerTitle.contains('carabiner') || lowerTitle.contains('quickdraw')) {
+    if (lowerTitle.contains('karabiner') ||
+        lowerTitle.contains('carabiner') ||
+        lowerTitle.contains('quickdraw')) {
       return Icons.lock_outline_rounded;
     }
-    if (lowerTitle.contains('lampu') || lowerTitle.contains('headlamp') || lowerTitle.contains('senter')) {
+    if (lowerTitle.contains('lampu') ||
+        lowerTitle.contains('headlamp') ||
+        lowerTitle.contains('senter')) {
       return Icons.flashlight_on_rounded;
     }
-    if (lowerTitle.contains('descender') || lowerTitle.contains('ascender') || lowerTitle.contains('jumar') || lowerTitle.contains('stop')) {
+    if (lowerTitle.contains('descender') ||
+        lowerTitle.contains('ascender') ||
+        lowerTitle.contains('jumar') ||
+        lowerTitle.contains('stop')) {
       return Icons.anchor_rounded;
     }
-    if (lowerTitle.contains('baju') || lowerTitle.contains('wearpack') || lowerTitle.contains('coverall')) {
+    if (lowerTitle.contains('baju') ||
+        lowerTitle.contains('wearpack') ||
+        lowerTitle.contains('coverall')) {
       return Icons.dry_cleaning_rounded;
     }
     if (lowerTitle.contains('sepatu') || lowerTitle.contains('boots')) {
@@ -273,25 +425,37 @@ class GearManager extends ChangeNotifier {
     final catId = item.categoryId.toLowerCase();
 
     // 1. Tali Dinamis / Tali Statis / Webbing
-    if (lowerTitle.contains('tali') || lowerTitle.contains('rope') || lowerTitle.contains('sling') || lowerTitle.contains('cowstail')) {
+    if (lowerTitle.contains('tali') ||
+        lowerTitle.contains('rope') ||
+        lowerTitle.contains('sling') ||
+        lowerTitle.contains('cowstail')) {
       final isDynamic = lowerTitle.contains('dinamis') || lowerTitle.contains('dynamic');
       return CareGuideModel(
-        heroTitle: isDynamic ? 'Merawat Tali Dinamis Keselamatan' : 'Merawat Tali Statis Speleologi',
-        heroSubtitle: 'Panduan standar pemeliharaan, pencucian tanpa merusak inti kernmantle, dan inspeksi taktil berkala.',
-        heroImageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD_dxMrFHdVRzjwjDrqp8lZkxNOWMuqK-gIezGXHzOkSddQo6C1Wb8BVZwVKfAHwZxQKwd3rpPN013aHaPsqDwFCQRfuSAvy7Fqce2MTetr5thX4rD6yEvwukgvF3Rmq9VHtnhuKq-w27pGCV_A088z61VCOOLQgrPATZruqhq1NE07TKHNAmxQKTp69qhsh-aY35BSzvTmMrNhHIZ9_7IN6Q9np-rr7ogdfn-k3mPyL6c_aqrFpMgw',
+        heroTitle: isDynamic
+            ? 'Merawat Tali Dinamis Keselamatan'
+            : 'Merawat Tali Statis Speleologi',
+        heroSubtitle:
+            'Panduan standar pemeliharaan, pencucian tanpa merusak inti kernmantle, dan inspeksi taktil berkala.',
+        heroImageUrl:
+            'https://lh3.googleusercontent.com/aida-public/AB6AXuD_dxMrFHdVRzjwjDrqp8lZkxNOWMuqK-gIezGXHzOkSddQo6C1Wb8BVZwVKfAHwZxQKwd3rpPN013aHaPsqDwFCQRfuSAvy7Fqce2MTetr5thX4rD6yEvwukgvF3Rmq9VHtnhuKq-w27pGCV_A088z61VCOOLQgrPATZruqhq1NE07TKHNAmxQKTp69qhsh-aY35BSzvTmMrNhHIZ9_7IN6Q9np-rr7ogdfn-k3mPyL6c_aqrFpMgw',
         cleaningTitle: 'Pembersihan Ringan',
-        cleaningDesc: 'Gunakan air dingin (<30°C) dan sabun khusus tali berbahan lembut (non-deterjen). Sikat perlahan dengan sikat spiral/sikat nylon halus untuk merontokkan lumpur goa dan partikel kristal kuarsa yang bisa mengikis serat inti.',
+        cleaningDesc:
+            'Gunakan air dingin (<30°C) dan sabun khusus tali berbahan lembut (non-deterjen). Sikat perlahan dengan sikat spiral/sikat nylon halus untuk merontokkan lumpur goa dan partikel kristal kuarsa yang bisa mengikis serat inti.',
         dryingTitle: 'Proses Pengeringan',
-        dryingDesc: 'Keringkan dengan cara diangin-anginkan di tempat teduh dan sirkulasi lancar. DILARANG keras menjemur di bawah terik matahari langsung atau memakai hair dryer/pemanas yang dapat merusak elastisitas poliamida.',
+        dryingDesc:
+            'Keringkan dengan cara diangin-anginkan di tempat teduh dan sirkulasi lancar. DILARANG keras menjemur di bawah terik matahari langsung atau memakai hair dryer/pemanas yang dapat merusak elastisitas poliamida.',
         storageTitle: 'Penyimpanan Ideal',
-        storageDesc: 'Penyimpanan yang tepat menjaga umur tali tetap prima hingga 5-10 tahun. Pastikan tali 100% kering sebelum masuk ke dalam rope bag.',
+        storageDesc:
+            'Penyimpanan yang tepat menjaga umur tali tetap prima hingga 5-10 tahun. Pastikan tali 100% kering sebelum masuk ke dalam rope bag.',
         storageRules: [
           'Teknik Kumparan Kupu-kupu (Butterfly Coil) atau susun rapi dalam Rope Bag berpori.',
           'Suhu & Kelembapan: Simpan di ruangan sejuk (15-20°C), kering, dan bebas dari tikus.',
           'Bebas Bahan Kimia: Jauhkan dari asam baterai aki/headlamp, cairan pemutih, pelarut minyak, atau bensin.',
         ],
-        storageImageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAtSA_5Oc7vpbHgtd-2XyVhlyM9BSx01eQXNFAau_z1cmuKM9tSjjSOU_cfoCEDZrQKzxswVoawYM16pZlrvDQ8PjBC2M0_kAWJ9zILw7GR0MLquoR9RbvY5kof8LS9B2YGV47MjL8xfYqvBKRnKrRMl4emkoC-vcr-eLMCi34xyTzwhQSthNPNaCkurUg219CpvcPUod2S4r1YHCXoc1CCkwtKIzsLFKiTI9Ofgcse8vCtki4TnWRI',
-        safetyDesc: 'Lakukan inspeksi taktil (meraba seluruh panjang tali) dan visual sebelum dan sesudah ekspedisi. Tali wajib segera dipensiunkan jika ditemukan:',
+        storageImageUrl:
+            'https://lh3.googleusercontent.com/aida-public/AB6AXuAtSA_5Oc7vpbHgtd-2XyVhlyM9BSx01eQXNFAau_z1cmuKM9tSjjSOU_cfoCEDZrQKzxswVoawYM16pZlrvDQ8PjBC2M0_kAWJ9zILw7GR0MLquoR9RbvY5kof8LS9B2YGV47MjL8xfYqvBKRnKrRMl4emkoC-vcr-eLMCi34xyTzwhQSthNPNaCkurUg219CpvcPUod2S4r1YHCXoc1CCkwtKIzsLFKiTI9Ofgcse8vCtki4TnWRI',
+        safetyDesc:
+            'Lakukan inspeksi taktil (meraba seluruh panjang tali) dan visual sebelum dan sesudah ekspedisi. Tali wajib segera dipensiunkan jika ditemukan:',
         retirementCriteria: const [
           RetirementCriterion(icon: Icons.content_cut_rounded, title: 'Kerusakan Selubung (Sheath) Parah'),
           RetirementCriterion(icon: Icons.visibility_rounded, title: 'Inti Putih (Core) Terlihat Keluar'),
@@ -302,24 +466,33 @@ class GearManager extends ChangeNotifier {
     }
 
     // 2. Harness & Pelindung Tubuh
-    if (lowerTitle.contains('harness') || lowerTitle.contains('sabuk') || lowerTitle.contains('chest')) {
+    if (lowerTitle.contains('harness') ||
+        lowerTitle.contains('sabuk') ||
+        lowerTitle.contains('chest')) {
       return CareGuideModel(
         heroTitle: 'Merawat Harness & Sabuk Tubuh',
-        heroSubtitle: 'Menjaga kekuatan jahitan webbing penahan beban tubuh dan ketahanan gesekan lumpur goa.',
-        heroImageUrl: 'https://images.unsplash.com/photo-1522163182402-834f871fd851?auto=format&fit=crop&w=1000&q=80',
+        heroSubtitle:
+            'Menjaga kekuatan jahitan webbing penahan beban tubuh dan ketahanan gesekan lumpur goa.',
+        heroImageUrl:
+            'https://images.unsplash.com/photo-1522163182402-834f871fd851?auto=format&fit=crop&w=1000&q=80',
         cleaningTitle: 'Pembersihan Webbing & Pad',
-        cleaningDesc: 'Bilas dengan air bersih suam-suam kuku setelah terkena lumpur goa atau keringat garam. Gunakan sikat berbulu lembut pada webbing dan buckle logam. Jangan gunakan pelarut korosif.',
+        cleaningDesc:
+            'Bilas dengan air bersih suam-suam kuku setelah terkena lumpur goa atau keringat garam. Gunakan sikat berbulu lembut pada webbing dan buckle logam. Jangan gunakan pelarut korosif.',
         dryingTitle: 'Pengeringan Alami',
-        dryingDesc: 'Gantung harness di tempat teduh dengan sirkulasi udara baik. Hindari paparan sinar UV matahari berlebihan yang dapat mendegradasi poliester.',
+        dryingDesc:
+            'Gantung harness di tempat teduh dengan sirkulasi udara baik. Hindari paparan sinar UV matahari berlebihan yang dapat mendegradasi poliester.',
         storageTitle: 'Penyimpanan Harness',
-        storageDesc: 'Simpan harness dalam kantong jaring berventilasi agar busa bantalan tidak lembap dan buckle tidak berkarat.',
+        storageDesc:
+            'Simpan harness dalam kantong jaring berventilasi agar busa bantalan tidak lembap dan buckle tidak berkarat.',
         storageRules: [
           'Gantung bebas atau simpan dalam mesh pouch bawaan tanpa tertindih alat berat.',
           'Pastikan buckle logam dilapisi lapisan tipis silikon food-grade jika disimpan lama.',
           'Hindari kontak langsung dengan asam, minyak gemuk kotor, atau zat pembersih keras.',
         ],
-        storageImageUrl: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=1000&q=80',
-        safetyDesc: 'Lakukan inspeksi visual jahitan pengaman (bar-tack) dan ring logam sebelum digunakan. Segera pensiunkan jika:',
+        storageImageUrl:
+            'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=1000&q=80',
+        safetyDesc:
+            'Lakukan inspeksi visual jahitan pengaman (bar-tack) dan ring logam sebelum digunakan. Segera pensiunkan jika:',
         retirementCriteria: const [
           RetirementCriterion(icon: Icons.content_cut_rounded, title: 'Benang Jahitan Bar-tack Terputus/Aus'),
           RetirementCriterion(icon: Icons.shield_outlined, title: 'Belay Loop Terkikis Gesekan >10%'),
@@ -330,24 +503,39 @@ class GearManager extends ChangeNotifier {
     }
 
     // 3. Hardware (Carabiner, Quickdraw, Belay Device, Descender, Ascender/Jumar)
-    if (catId == 'hardware' || lowerTitle.contains('carabiner') || lowerTitle.contains('karabiner') || lowerTitle.contains('quickdraw') || lowerTitle.contains('belay') || lowerTitle.contains('descender') || lowerTitle.contains('ascender') || lowerTitle.contains('jumar') || lowerTitle.contains('stop')) {
+    if (catId == 'hardware' ||
+        lowerTitle.contains('carabiner') ||
+        lowerTitle.contains('karabiner') ||
+        lowerTitle.contains('quickdraw') ||
+        lowerTitle.contains('belay') ||
+        lowerTitle.contains('descender') ||
+        lowerTitle.contains('ascender') ||
+        lowerTitle.contains('jumar') ||
+        lowerTitle.contains('stop')) {
       return CareGuideModel(
         heroTitle: 'Merawat Logam & Perangkat SRT/Belay',
-        heroSubtitle: 'Mencegah korosi, keausan alur gesekan tali, dan macetnya pegas gerbang autolock/cam jumar.',
-        heroImageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=1000&q=80',
+        heroSubtitle:
+            'Mencegah korosi, keausan alur gesekan tali, dan macetnya pegas gerbang autolock/cam jumar.',
+        heroImageUrl:
+            'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=1000&q=80',
         cleaningTitle: 'Pencucian Lumpur & Kerikil',
-        cleaningDesc: 'Rendam perangkat dalam air hangat untuk melarutkan lumpur goa yang menyumbat pegas cam jumar atau ulir karabiner. Sikat celah bergerak dengan sikat gigi bekas.',
+        cleaningDesc:
+            'Rendam perangkat dalam air hangat untuk melarutkan lumpur goa yang menyumbat pegas cam jumar atau ulir karabiner. Sikat celah bergerak dengan sikat gigi bekas.',
         dryingTitle: 'Pengeringan & Lubrikasi',
-        dryingDesc: 'Keringkan dengan kain microfiber sampai tuntas. Berikan setetes pelumas berbasis PTFE kering (dry silicone) pada poros pegas/cam, lalu seka sisa cairan.',
+        dryingDesc:
+            'Keringkan dengan kain microfiber sampai tuntas. Berikan setetes pelumas berbasis PTFE kering (dry silicone) pada poros pegas/cam, lalu seka sisa cairan.',
         storageTitle: 'Penyimpanan Hardware',
-        storageDesc: 'Simpan perangkat logam di tempat kering dengan kantong silica gel untuk mencegah oksidasi dan korosi galvanik.',
+        storageDesc:
+            'Simpan perangkat logam di tempat kering dengan kantong silica gel untuk mencegah oksidasi dan korosi galvanik.',
         storageRules: [
           'Pisahkan komponen aluminium dan baja saat penyimpanan jangka panjang.',
           'Pastikan gerbang karabiner dan cam jumar dapat bergerak membal secara spontan.',
           'Jauhkan dari uap asam aki atau udara lembap bersulfur tinggi.',
         ],
-        storageImageUrl: 'https://images.unsplash.com/photo-1516592673884-4a382d1124c2?auto=format&fit=crop&w=1000&q=80',
-        safetyDesc: 'Periksa keausan alur tali (groove wear) dan kelurusan struktur logam. Pensiunkan segera jika:',
+        storageImageUrl:
+            'https://images.unsplash.com/photo-1516592673884-4a382d1124c2?auto=format&fit=crop&w=1000&q=80',
+        safetyDesc:
+            'Periksa keausan alur tali (groove wear) dan kelurusan struktur logam. Pensiunkan segera jika:',
         retirementCriteria: const [
           RetirementCriterion(icon: Icons.broken_image_rounded, title: 'Ditemukan Retak Rambut (Hairline Crack)'),
           RetirementCriterion(icon: Icons.compress_rounded, title: 'Keausan Gesekan Tali >1mm / Alur Dalam'),
@@ -358,24 +546,35 @@ class GearManager extends ChangeNotifier {
     }
 
     // 4. Penerangan & Elektronik (Headlamp, Baterai, GPS)
-    if (catId == 'penerangan' || lowerTitle.contains('headlamp') || lowerTitle.contains('lampu') || lowerTitle.contains('baterai') || lowerTitle.contains('senter')) {
+    if (catId == 'penerangan' ||
+        lowerTitle.contains('headlamp') ||
+        lowerTitle.contains('lampu') ||
+        lowerTitle.contains('baterai') ||
+        lowerTitle.contains('senter')) {
       return CareGuideModel(
         heroTitle: 'Merawat Headlamp & Sistem Penerangan',
-        heroSubtitle: 'Mempertahankan integritas segel tahan air (O-ring IPX8) dan daya tahan baterai lithium.',
-        heroImageUrl: 'https://images.unsplash.com/photo-1510312305653-8ed496efae75?auto=format&fit=crop&w=1000&q=80',
+        heroSubtitle:
+            'Mempertahankan integritas segel tahan air (O-ring IPX8) dan daya tahan baterai lithium.',
+        heroImageUrl:
+            'https://images.unsplash.com/photo-1510312305653-8ed496efae75?auto=format&fit=crop&w=1000&q=80',
         cleaningTitle: 'Pembersihan Kaca Lensa & Body',
-        cleaningDesc: 'Lap body headlamp dengan kain lembap bersih. Bersihkan lumpur di celah tombol dan lensa dengan cotton bud. Jangan gunakan alkohol pada karet seal.',
+        cleaningDesc:
+            'Lap body headlamp dengan kain lembap bersih. Bersihkan lumpur di celah tombol dan lensa dengan cotton bud. Jangan gunakan alkohol pada karet seal.',
         dryingTitle: 'Pengecekan Kompartemen',
-        dryingDesc: 'Buka slot baterai setelah pemakaian di lingkungan goa berair/lembab tinggi untuk memastikan tidak ada kondensasi di dalam kompartemen.',
+        dryingDesc:
+            'Buka slot baterai setelah pemakaian di lingkungan goa berair/lembab tinggi untuk memastikan tidak ada kondensasi di dalam kompartemen.',
         storageTitle: 'Penyimpanan Elektronik',
-        storageDesc: 'Simpan headlamp di dalam dry box atau hard case khusus outdoor bersama silica gel.',
+        storageDesc:
+            'Simpan headlamp di dalam dry box atau hard case khusus outdoor bersama silica gel.',
         storageRules: [
           'Lepaskan baterai jika alat tidak akan digunakan dalam kurun waktu lebih dari 2 minggu.',
           'Lumasi O-ring karet secara berkala dengan petroleum jelly / silikon grease.',
           'Isi daya baterai lithium minimal 50-70% sebelum disimpan dalam waktu lama.',
         ],
-        storageImageUrl: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?auto=format&fit=crop&w=1000&q=80',
-        safetyDesc: 'Pastikan keandalan optik dan kelistrikan sebelum memasuki medan gelap goa. Ganti jika:',
+        storageImageUrl:
+            'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?auto=format&fit=crop&w=1000&q=80',
+        safetyDesc:
+            'Pastikan keandalan optik dan kelistrikan sebelum memasuki medan gelap goa. Ganti jika:',
         retirementCriteria: const [
           RetirementCriterion(icon: Icons.battery_alert_rounded, title: 'Baterai Menggelembung atau Korosi Terminal'),
           RetirementCriterion(icon: Icons.water_damage_rounded, title: 'Segel Karet O-ring Robek / Bocor Air'),
@@ -386,24 +585,37 @@ class GearManager extends ChangeNotifier {
     }
 
     // 5. Kebutuhan Khusus Goa (Wearpack Caving, Boots, Kneepad, Helm Caving)
-    if (catId == 'kebutuhan_goa' || lowerTitle.contains('wearpack') || lowerTitle.contains('coverall') || lowerTitle.contains('helm') || lowerTitle.contains('kneepad') || lowerTitle.contains('boots') || lowerTitle.contains('sepatu')) {
+    if (catId == 'kebutuhan_goa' ||
+        lowerTitle.contains('wearpack') ||
+        lowerTitle.contains('coverall') ||
+        lowerTitle.contains('helm') ||
+        lowerTitle.contains('kneepad') ||
+        lowerTitle.contains('boots') ||
+        lowerTitle.contains('sepatu')) {
       return CareGuideModel(
         heroTitle: 'Merawat Perlengkapan Speleologi / Goa',
-        heroSubtitle: 'Melindungi coverall PVC dan pelindung tubuh dari abrasi tajam stalaktit dan lumpur asam.',
-        heroImageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80',
+        heroSubtitle:
+            'Melindungi coverall PVC dan pelindung tubuh dari abrasi tajam stalaktit dan lumpur asam.',
+        heroImageUrl:
+            'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1000&q=80',
         cleaningTitle: 'Pencucian Lumpur Berat',
-        cleaningDesc: 'Semprot wearpack dan boots dengan selang air bertekanan sedang segera setelah keluar goa. Jangan biarkan lumpur mengering dan mengeras pada ritsleting atau jahitan sintetis.',
+        cleaningDesc:
+            'Semprot wearpack dan boots dengan selang air bertekanan sedang segera setelah keluar goa. Jangan biarkan lumpur mengering dan mengeras pada ritsleting atau jahitan sintetis.',
         dryingTitle: 'Pengeringan Sempurna',
-        dryingDesc: 'Balik coverall dan gantung di tempat teduh berangin. Pastikan bagian dalam benar-benar kering sebelum disimpan untuk mencegah timbulnya jamur bau.',
+        dryingDesc:
+            'Balik coverall dan gantung di tempat teduh berangin. Pastikan bagian dalam benar-benar kering sebelum disimpan untuk mencegah timbulnya jamur bau.',
         storageTitle: 'Penyimpanan Perlengkapan Goa',
-        storageDesc: 'Simpan di lemari berventilasi baik jauh dari paparan cahaya matahari langsung dan panas atap.',
+        storageDesc:
+            'Simpan di lemari berventilasi baik jauh dari paparan cahaya matahari langsung dan panas atap.',
         storageRules: [
           'Gantung wearpack lurus tanpa lipatan tajam yang dapat memicu retak lapisan PVC.',
           'Beri pelumas lilin lebah (beeswax) pada ritsleting logam/plastik tahan karat.',
           'Pastikan bagian busa helm dan bantalan lutut telah steril dan kering.',
         ],
-        storageImageUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80',
-        safetyDesc: 'Pemeriksaan integritas pelindung benturan dan jahitan penutup tubuh:',
+        storageImageUrl:
+            'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80',
+        safetyDesc:
+            'Pemeriksaan integritas pelindung benturan dan jahitan penutup tubuh:',
         retirementCriteria: const [
           RetirementCriterion(icon: Icons.sports_motorsports_rounded, title: 'Cangkang Helm Retak / Busa EPS Rusak'),
           RetirementCriterion(icon: Icons.content_cut_rounded, title: 'Robekan Besar pada Bagian Kunci Wearpack'),
@@ -416,21 +628,28 @@ class GearManager extends ChangeNotifier {
     // Default Fallback Guide untuk Custom Tools
     return CareGuideModel(
       heroTitle: 'Panduan Perawatan ${item.title}',
-      heroSubtitle: 'Menjaga performa, kebersihan, dan keselamatan penggunaan peralatan ekspedisi outdoor.',
-      heroImageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD_dxMrFHdVRzjwjDrqp8lZkxNOWMuqK-gIezGXHzOkSddQo6C1Wb8BVZwVKfAHwZxQKwd3rpPN013aHaPsqDwFCQRfuSAvy7Fqce2MTetr5thX4rD6yEvwukgvF3Rmq9VHtnhuKq-w27pGCV_A088z61VCOOLQgrPATZruqhq1NE07TKHNAmxQKTp69qhsh-aY35BSzvTmMrNhHIZ9_7IN6Q9np-rr7ogdfn-k3mPyL6c_aqrFpMgw',
+      heroSubtitle:
+          'Menjaga performa, kebersihan, dan keselamatan penggunaan peralatan ekspedisi outdoor.',
+      heroImageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuD_dxMrFHdVRzjwjDrqp8lZkxNOWMuqK-gIezGXHzOkSddQo6C1Wb8BVZwVKfAHwZxQKwd3rpPN013aHaPsqDwFCQRfuSAvy7Fqce2MTetr5thX4rD6yEvwukgvF3Rmq9VHtnhuKq-w27pGCV_A088z61VCOOLQgrPATZruqhq1NE07TKHNAmxQKTp69qhsh-aY35BSzvTmMrNhHIZ9_7IN6Q9np-rr7ogdfn-k3mPyL6c_aqrFpMgw',
       cleaningTitle: 'Pembersihan Standar',
-      cleaningDesc: 'Bersihkan kotoran, debu, dan partikel tanah menggunakan kain basah dan sabun lembut berbahan netral. Hindari penggunaan deterjen keras atau sikat kawat.',
+      cleaningDesc:
+          'Bersihkan kotoran, debu, dan partikel tanah menggunakan kain basah dan sabun lembut berbahan netral. Hindari penggunaan deterjen keras atau sikat kawat.',
       dryingTitle: 'Pengeringan Alami',
-      dryingDesc: 'Angin-anginkan di tempat terlindung dari terik matahari langsung hingga kering sempurna sebelum disimpan.',
+      dryingDesc:
+          'Angin-anginkan di tempat terlindung dari terik matahari langsung hingga kering sempurna sebelum disimpan.',
       storageTitle: 'Penyimpanan Rapi & Kering',
-      storageDesc: 'Simpan di ruangan yang memiliki ventilasi memadai, kering, dan bebas dari kelembapan tinggi.',
+      storageDesc:
+          'Simpan di ruangan yang memiliki ventilasi memadai, kering, dan bebas dari kelembapan tinggi.',
       storageRules: [
         'Simpan pada kotak atau rak penyimpanan khusus alat ekspedisi.',
         'Jauhkan dari kontak langsung dengan zat kimia agresif atau suhu ekstrem.',
         'Lakukan pengecekan berkala setiap 3-6 bulan meski alat jarang digunakan.',
       ],
-      storageImageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAtSA_5Oc7vpbHgtd-2XyVhlyM9BSx01eQXNFAau_z1cmuKM9tSjjSOU_cfoCEDZrQKzxswVoawYM16pZlrvDQ8PjBC2M0_kAWJ9zILw7GR0MLquoR9RbvY5kof8LS9B2YGV47MjL8xfYqvBKRnKrRMl4emkoC-vcr-eLMCi34xyTzwhQSthNPNaCkurUg219CpvcPUod2S4r1YHCXoc1CCkwtKIzsLFKiTI9Ofgcse8vCtki4TnWRI',
-      safetyDesc: 'Lakukan pemeriksaan visual menyeluruh sebelum digunakan ke medan lapangan:',
+      storageImageUrl:
+          'https://lh3.googleusercontent.com/aida-public/AB6AXuAtSA_5Oc7vpbHgtd-2XyVhlyM9BSx01eQXNFAau_z1cmuKM9tSjjSOU_cfoCEDZrQKzxswVoawYM16pZlrvDQ8PjBC2M0_kAWJ9zILw7GR0MLquoR9RbvY5kof8LS9B2YGV47MjL8xfYqvBKRnKrRMl4emkoC-vcr-eLMCi34xyTzwhQSthNPNaCkurUg219CpvcPUod2S4r1YHCXoc1CCkwtKIzsLFKiTI9Ofgcse8vCtki4TnWRI',
+      safetyDesc:
+          'Lakukan pemeriksaan visual menyeluruh sebelum digunakan ke medan lapangan:',
       retirementCriteria: const [
         RetirementCriterion(icon: Icons.warning_amber_rounded, title: 'Terjadi Deformasi Fisik atau Bengkok'),
         RetirementCriterion(icon: Icons.broken_image_rounded, title: 'Keretakan atau Kerusakan Komponen Kritis'),
@@ -443,7 +662,7 @@ class GearManager extends ChangeNotifier {
   String _formatDate(DateTime dt) {
     final months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -461,7 +680,8 @@ class GearManager extends ChangeNotifier {
         id: 'tali_keamanan',
         title: 'Tali & Keamanan',
         icon: Icons.shield_outlined,
-        description: 'Tali dinamis, harness panjat & caving, cowstail, dan pelindung kepala.',
+        description:
+            'Tali dinamis, harness panjat & caving, cowstail, dan pelindung kepala.',
         items: [
           GearItem(
             id: 'tk_1',
@@ -511,7 +731,8 @@ class GearManager extends ChangeNotifier {
         id: 'hardware',
         title: 'Hardware',
         icon: Icons.handyman_outlined,
-        description: 'Karabiner, Quickdraw, Descender Petzl Stop, Belay Device, & Ascender Jumar.',
+        description:
+            'Karabiner, Quickdraw, Descender Petzl Stop, Belay Device, & Ascender Jumar.',
         items: [
           GearItem(
             id: 'hw_1',
@@ -559,7 +780,8 @@ class GearManager extends ChangeNotifier {
         id: 'penerangan',
         title: 'Penerangan',
         icon: Icons.flashlight_on_outlined,
-        description: 'Headlamp waterproof goa, baterai cadangan, dan lampu darurat.',
+        description:
+            'Headlamp waterproof goa, baterai cadangan, dan lampu darurat.',
         items: [
           GearItem(
             id: 'pen_1',
@@ -587,7 +809,8 @@ class GearManager extends ChangeNotifier {
         id: 'kebutuhan_goa',
         title: 'Kebutuhan Goa',
         icon: Icons.explore_outlined,
-        description: 'Wearpack PVC Caving, Boots anti slip, Footloop, & Kneepad protektor.',
+        description:
+            'Wearpack PVC Caving, Boots anti slip, Footloop, & Kneepad protektor.',
         items: [
           GearItem(
             id: 'goa_1',
@@ -597,7 +820,8 @@ class GearManager extends ChangeNotifier {
             subtitle: 'Kondisi Baik & Siap Digunakan',
             isReady: true,
             lastMaintenanceDate: DateTime.now().subtract(const Duration(days: 5)),
-            lastMaintenanceNote: 'Dibersihkan dari lumpur goa dan ritsleting dilumasi.',
+            lastMaintenanceNote:
+                'Dibersihkan dari lumpur goa dan ritsleting dilumasi.',
           ),
           GearItem(
             id: 'goa_2',

@@ -3,6 +3,7 @@ import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/features/map/screens/spot_detail_screen.dart';
 import 'package:flutter_application_1/features/map/models/bookmark_model.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
+import 'package:flutter_application_1/core/services/bookmark_firestore_service.dart';
 
 class DaftarBookmarkPage extends StatefulWidget {
   final int? userId;
@@ -16,12 +17,43 @@ class DaftarBookmarkPage extends StatefulWidget {
 class _DaftarBookmarkPageState extends State<DaftarBookmarkPage> {
   List<BookmarkModel> _bookmarks = [];
   bool _isLoading = true;
+  bool _isSyncing = false;
   int _activeUserId = 1;
 
   @override
   void initState() {
     super.initState();
     _loadBookmarks();
+    _syncWithCloud();
+  }
+
+  Future<void> _syncWithCloud() async {
+    try {
+      await BookmarkFirestoreService.instance.syncBookmarks();
+      if (mounted) {
+        final uid = widget.userId ?? (await DatabaseHelper.instance.getActiveUserId()) ?? 1;
+        final list = await DatabaseHelper.instance.getUserBookmarks(uid);
+        setState(() {
+          _activeUserId = uid;
+          _bookmarks = list;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _manualSync() async {
+    setState(() => _isSyncing = true);
+    await _syncWithCloud();
+    if (mounted) {
+      setState(() => _isSyncing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Bookmark berhasil disinkronkan dengan Cloud Firestore!'),
+          backgroundColor: context.themePrimary,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _loadBookmarks() async {
@@ -92,6 +124,25 @@ class _DaftarBookmarkPageState extends State<DaftarBookmarkPage> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: _isSyncing
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: context.themePrimary,
+                    ),
+                  )
+                : Icon(
+                    Icons.cloud_sync_rounded,
+                    color: context.themePrimary,
+                  ),
+            tooltip: 'Sinkronkan dengan Cloud',
+            onPressed: _isSyncing ? null : _manualSync,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
