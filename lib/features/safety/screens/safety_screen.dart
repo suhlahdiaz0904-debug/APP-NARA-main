@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_application_1/core/theme/theme_provider.dart';
-import 'package:flutter_application_1/features/safety/screens/sos_active_screen.dart';
 import 'package:flutter_application_1/features/safety/screens/friend_tracker_screen.dart';
 import 'package:flutter_application_1/features/safety/screens/women_safety_screen.dart';
+import 'package:flutter_application_1/features/safety/screens/critical_protocol_screen.dart';
+import 'package:flutter_application_1/features/safety/screens/sos_active_screen.dart';
 import 'package:flutter_application_1/core/database/database_helper.dart';
 import 'package:flutter_application_1/features/weather/screens/weather_screen.dart';
 import 'package:flutter_application_1/core/services/safety_firestore_service.dart';
@@ -27,82 +27,21 @@ class KeamananPage extends StatefulWidget {
   State<KeamananPage> createState() => _KeamananPageState();
 }
 
-class _KeamananPageState extends State<KeamananPage>
-    with TickerProviderStateMixin {
-  // Palet Warna Resmi NARA Safety Dashboard (Earth Tone)
-  static const Color darkGreen = Color(0xFF1E382B); // Deep Forest Moss
-  static const Color accentAmber = Color(0xFFDDA15E); // Warm Desert Ochre
+class _KeamananPageState extends State<KeamananPage> {
   static const Color errorRed = Color(0xFFD94A3D); // Warm Burnt Crimson
-
-  // Animasi Denyut SOS & Long-press Progress
-  late AnimationController _pulseController;
-  late AnimationController _holdController;
-  bool _isHoldingSos = false;
 
   // Data Sinkronisasi Lokasi, Jam, dan Cuaca Lapangan
   String _locationName = 'Tebing Citatah, Bandung';
   String _timeText = '14:20';
   String _weatherText = '28°C Cerah';
   IconData _weatherIcon = Icons.wb_sunny_rounded;
-  String _latText = '-6.83960° S';
-  String _lonText = '107.45240° E';
-  String _elevationText = '450 m ASL';
 
   Timer? _clockTimer;
-  String _selectedSafetyFilter = 'Semua';
 
   // Firebase Streams & State
   StreamSubscription? _sosAlertsSubscription;
   StreamSubscription? _liveTrackersSubscription;
   final List<Map<String, dynamic>> _remoteSosAlerts = [];
-
-  final List<Map<String, dynamic>> _safetyFilterCategories = [
-    {
-      'name': 'Semua',
-      'label': 'Semua Fitur',
-      'icon': Icons.auto_awesome_rounded,
-      'gradient': [Color(0xFF143023), Color(0xFF2E7D32)],
-      'accentColor': Color(0xFF4CAF78),
-      'unselectedBg': Color(0xFFE8F5E9),
-      'unselectedIcon': Color(0xFF2E7D32),
-    },
-    {
-      'name': 'SOS',
-      'label': 'Tombol Darurat SOS',
-      'icon': Icons.sos_rounded,
-      'gradient': [Color(0xFFB71C1C), Color(0xFFE53935)],
-      'accentColor': Color(0xFFFF8A80),
-      'unselectedBg': Color(0xFFFFEBEE),
-      'unselectedIcon': Color(0xFFD32F2F),
-    },
-    {
-      'name': 'Wanita',
-      'label': 'Kebutuhan Wanita',
-      'icon': Icons.female_rounded,
-      'gradient': [Color(0xFF880E4F), Color(0xFFE91E63)],
-      'accentColor': Color(0xFFFF80AB),
-      'unselectedBg': Color(0xFFFCE4EC),
-      'unselectedIcon': Color(0xFFC2185B),
-    },
-    {
-      'name': 'Satelit',
-      'label': 'Satelit & GPS',
-      'icon': Icons.satellite_alt_rounded,
-      'gradient': [Color(0xFF0D47A1), Color(0xFF1E88E5)],
-      'accentColor': Color(0xFF82B1FF),
-      'unselectedBg': Color(0xFFE3F2FD),
-      'unselectedIcon': Color(0xFF1976D2),
-    },
-    {
-      'name': 'Evakuasi',
-      'label': 'Protokol Evakuasi',
-      'icon': Icons.medical_services_rounded,
-      'gradient': [Color(0xFFE65100), Color(0xFFFF9800)],
-      'accentColor': Color(0xFFFFAB91),
-      'unselectedBg': Color(0xFFFBE9E7),
-      'unselectedIcon': Color(0xFFD84315),
-    },
-  ];
 
   // Data Teman Luring (Offline Mesh Tracker) berasal dari Firebase Firestore & SQLite
   final List<Map<String, dynamic>> _offlinePeers = [];
@@ -112,19 +51,6 @@ class _KeamananPageState extends State<KeamananPage>
   @override
   void initState() {
     super.initState();
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-
-    _holdController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 3))
-          ..addStatusListener((status) {
-            if (status == AnimationStatus.completed) {
-              _triggerSosEmergency();
-            }
-          });
 
     // Inisialisasi Jam & Cuaca
     _updateClockTime();
@@ -136,6 +62,16 @@ class _KeamananPageState extends State<KeamananPage>
     _initFirebaseSubscriptions();
   }
 
+  String _lastNotifiedSosId = '';
+
+  void _triggerEmergencyHapticAlert() {
+    HapticFeedback.heavyImpact();
+    Timer(const Duration(milliseconds: 250), () => HapticFeedback.heavyImpact());
+    Timer(const Duration(milliseconds: 500), () => HapticFeedback.vibrate());
+    Timer(const Duration(milliseconds: 900), () => HapticFeedback.vibrate());
+    Timer(const Duration(milliseconds: 1300), () => HapticFeedback.heavyImpact());
+  }
+
   /// Inisialisasi pendengar Firebase Firestore untuk Sinyal Darurat SOS & Live Trackers
   void _initFirebaseSubscriptions() {
     _sosAlertsSubscription = SafetyFirestoreService.instance
@@ -145,6 +81,16 @@ class _KeamananPageState extends State<KeamananPage>
       final currentUid = SafetyFirestoreService.instance.currentUserId;
       // Filter alert dari user lain (bukan diri sendiri)
       final otherAlerts = alerts.where((a) => a['userId'] != currentUid).toList();
+
+      if (otherAlerts.isNotEmpty) {
+        final latest = otherAlerts.first;
+        final alertId = latest['id'] ?? '';
+        if (_lastNotifiedSosId != alertId) {
+          _lastNotifiedSosId = alertId;
+          _triggerEmergencyHapticAlert();
+        }
+      }
+
       setState(() {
         _remoteSosAlerts
           ..clear()
@@ -218,8 +164,6 @@ class _KeamananPageState extends State<KeamananPage>
     _sosAlertsSubscription?.cancel();
     _liveTrackersSubscription?.cancel();
     _clockTimer?.cancel();
-    _pulseController.dispose();
-    _holdController.dispose();
     super.dispose();
   }
 
@@ -260,13 +204,6 @@ class _KeamananPageState extends State<KeamananPage>
         setState(() {
           _currentLat = lat;
           _currentLon = lon;
-          _latText = lat < 0
-              ? '${lat.abs().toStringAsFixed(6)}° S'
-              : '${lat.toStringAsFixed(6)}° N';
-          _lonText = lon < 0
-              ? '${lon.abs().toStringAsFixed(6)}° W'
-              : '${lon.toStringAsFixed(6)}° E';
-          _elevationText = '${pos.altitude.round()} m ASL';
         });
       }
 
@@ -394,67 +331,6 @@ class _KeamananPageState extends State<KeamananPage>
     }
   }
 
-  void _startHoldingSos() {
-    setState(() {
-      _isHoldingSos = true;
-    });
-    HapticFeedback.mediumImpact();
-    _holdController.forward(from: 0.0);
-  }
-
-  void _cancelHoldingSos() {
-    if (_holdController.isAnimating) {
-      _holdController.stop();
-      _holdController.reset();
-    }
-    setState(() {
-      _isHoldingSos = false;
-    });
-  }
-
-  void _triggerSosEmergency() async {
-    HapticFeedback.heavyImpact();
-    _holdController.reset();
-    setState(() {
-      _isHoldingSos = false;
-    });
-
-    // Menerbitkan sinyal darurat SOS ke Firebase Firestore
-    final alertId = await SafetyFirestoreService.instance.publishSosAlert(
-      latitude: _currentLat,
-      longitude: _currentLon,
-      altitude: _elevationText,
-    );
-
-    // Navigasi ke Halaman SOS Aktif (Sesuai Desain Stitch Google)
-    if (!mounted) return;
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SosAktifPage(
-          initialCoordinates: '$_latText, $_lonText',
-          initialAltitude: _elevationText,
-          initialAlertId: alertId,
-        ),
-      ),
-    );
-
-    // Saat kembali/batal, pastikan SOS dalam keadaan siap sedia (belum dipencet)
-    if (result == true && mounted) {
-      _holdController.reset();
-      setState(() {
-        _isHoldingSos = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sinyal SOS telah dibatalkan. Mode darurat non-aktif.'),
-          backgroundColor: darkGreen,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
   void _bukaHalamanPelacakTeman() {
     Navigator.push(
       context,
@@ -469,278 +345,23 @@ class _KeamananPageState extends State<KeamananPage>
     );
   }
 
-  void _showProtokolKritisSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final bool isDark = context.isDarkMode;
-
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.9,
-          decoration: BoxDecoration(
-            color: context.themeBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          ),
-          child: SafeArea(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 18),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  Center(
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: context.themeTerracotta.withValues(
-                              alpha: 0.15,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'PANDUAN EKSPLORASI',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                              color: context.themeTerracotta,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Protokol Kritis &\nLeave No Trace',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            color: context.themeText,
-                            height: 1.2,
-                            letterSpacing: -0.6,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Panduan sederhana untuk menjaga keamanan, sanitasi, dan keputusan darurat saat menjelajah di alam terbuka.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: context.themeTextSecondary,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: context.themeCard,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: context.themeBorder),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark
-                              ? Colors.black.withValues(alpha: 0.2)
-                              : context.themePrimary.withValues(alpha: 0.05),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: context.themeTerracotta.withValues(
-                              alpha: 0.2,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.eco_rounded,
-                            color: context.themeTerracotta,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Tindakan paling penting',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: context.themeText,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Semua langkah berikut dirancang agar aman, manusiawi, dan tetap menjaga alam.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: context.themeTextSecondary,
-                            height: 1.45,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildProtocolChecklistPanel(
-                    label: '01',
-                    title: '7 Prinsip Leave No Trace (LNT)',
-                    body:
-                        'Rencanakan dan persiapkan matang, berjelajah di jalur resmi, kelola sampah secara tuntas (bawa turun kembali), biarkan apa yang ditemukan, dan hormati satwa liar.',
-                    icon: Icons.forest_outlined,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildProtocolChecklistPanel(
-                    label: '02',
-                    title: 'Sanitasi & Lubang Cathole',
-                    body:
-                        'Buang air besar di lubang sedalam 15-20 cm dengan jarak minimal 60 meter dari sumber air, mata air tebing, dan jalur umum. Timbun kembali hingga rata.',
-                    icon: Icons.cleaning_services_outlined,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildProtocolChecklistPanel(
-                    label: '03',
-                    title: 'Sinyal Darurat Peluit & Cermin (Alpine Distress)',
-                    body:
-                        'Kirimkan 6 tiupan peluit / kilatan cermin per menit, jeda 1 menit, ulangi. Balasan konfirmasi dari tim penolong adalah 3 tiupan peluit per menit.',
-                    icon: Icons.campaign_rounded,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildProtocolChecklistPanel(
-                    label: '04',
-                    title: 'Evakuasi Korban Cedera di Ketinggian',
-                    body:
-                        'Amankan korban pada anchor cadangan ganda, periksa jalan napas dan pendarahan utama, stabilkan leher/tulang belakang sebelum memulai proses lowering.',
-                    icon: Icons.health_and_safety_outlined,
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: context.themePrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        'Paham & Patuhi Protokol',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+  void _bukaHalamanSosAktif() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SosAktifPage(
+          initialCoordinates:
+              '${_currentLat.toStringAsFixed(5)}°, ${_currentLon.toStringAsFixed(5)}°',
+          initialAltitude: '450 m ASL',
+        ),
+      ),
     );
   }
 
-  Widget _buildProtocolChecklistPanel({
-    required String label,
-    required String title,
-    required String body,
-    required IconData icon,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.themeCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.themeBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: context.themePrimary,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: context.themeTerracotta.withValues(alpha: 0.18),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: context.themeTerracotta, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: context.themeText,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  body,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: context.themeTextSecondary,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  void _bukaHalamanProtokolKritis() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProtokolKritisPage()),
     );
   }
 
@@ -753,13 +374,11 @@ class _KeamananPageState extends State<KeamananPage>
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // Glassmorphism SliverAppBar (Transparan dengan Blur seperti halaman lainnya)
           SliverAppBar(
             pinned: true,
             backgroundColor: Colors.transparent,
             elevation: 0,
             scrolledUnderElevation: 0,
-
             title: Text(
               'NARA',
               style: TextStyle(
@@ -770,14 +389,6 @@ class _KeamananPageState extends State<KeamananPage>
               ),
             ),
             centerTitle: true,
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: Container(
-                  color: context.themeBg.withValues(alpha: 0.85),
-                ),
-              ),
-            ),
             actions: [
               IconButton(
                 icon: Icon(
@@ -824,49 +435,182 @@ class _KeamananPageState extends State<KeamananPage>
                   ),
                   const SizedBox(height: 12),
 
-                  // Indikator Real-time Lokasi, Jam, dan Cuaca (Tersinkronisasi dengan Home)
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: context.themePrimary,
-                        size: 16,
+                  // Indikator Real-time Lokasi, Jam, dan Cuaca (Glassmorphism Pill)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? const [Color(0xFF1E2B23), Color(0xFF141F19)]
+                            : const [Color(0xFFE8F5E9), Color(0xFFF1F8E9)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          _locationName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: context.themeText,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: context.themePrimary.withValues(alpha: 0.3),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: context.themePrimary.withValues(alpha: isDark ? 0.2 : 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: context.themePrimary,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: context.themePrimary.withValues(alpha: 0.8),
+                                blurRadius: 6,
+                                spreadRadius: 1,
+                              ),
+                            ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: 14),
-                      Icon(
-                        _weatherIcon,
-                        color: AppTheme.goldAccentDark,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$_timeText • $_weatherText',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: context.themeTextSecondary,
-                          fontWeight: FontWeight.w500,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _locationName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: context.themeText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                    ],
+                        Container(
+                          height: 12,
+                          width: 1,
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                          color: context.themeBorder,
+                        ),
+                        Icon(
+                          _weatherIcon,
+                          color: AppTheme.goldAccentDark,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$_timeText • $_weatherText',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: context.themeTextSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Filter Fitur Keamanan Berwarna
-                  _buildSafetyFilterChips(),
-                  const SizedBox(height: 18),
+                  // =================================================================
+                  // TOMBOL DARURAT SOS (EMERGENCY BROADCAST TRIGGER)
+                  // =================================================================
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? const [Color(0xFF3E1210), Color(0xFF1E0A09)]
+                            : const [Color(0xFFD32F2F), Color(0xFFB71C1C)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD32F2F).withValues(alpha: 0.35),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.emergency_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'TOMBOL DARURAT SOS',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Picu sinyal darurat & getarkan perangkat tim sekitar',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.88),
+                                  fontSize: 11.5,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(
+                          onPressed: _bukaHalamanSosAktif,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFFB71C1C),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            'SOS',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                   // =================================================================
                   // NOTIFIKASI DARURAT SOS MASUK (DARI REKAN TIM DI FIRESTORE)
@@ -948,206 +692,6 @@ class _KeamananPageState extends State<KeamananPage>
                   ],
 
                   // =================================================================
-                  // 2. SOS CARD (INTERACTIVE TRIGGER & SATELLITE LINK)
-                  // =================================================================
-                  Container(
-                    decoration: BoxDecoration(
-                      color: context.themeCard,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark
-                              ? Colors.black.withValues(alpha: 0.3)
-                              : context.themePrimary.withValues(alpha: 0.06),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                      border: Border.all(color: context.themeBorder),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        // Top Half - SOS Action Area
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 32),
-                          color: AppTheme.errorRed.withValues(
-                            alpha: isDark ? 0.15 : 0.08,
-                          ),
-                          child: Column(
-                            children: [
-                              // Tombol SOS Interaktif dengan Efek Pulse & Hold Progress
-                              GestureDetector(
-                                onTapDown: (_) => _startHoldingSos(),
-                                onTapUp: (_) => _cancelHoldingSos(),
-                                onTapCancel: () => _cancelHoldingSos(),
-                                child: AnimatedBuilder(
-                                  animation: Listenable.merge([
-                                    _pulseController,
-                                    _holdController,
-                                  ]),
-                                  builder: (context, child) {
-                                    return Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        // Gelombang Pulse Luar
-                                        Container(
-                                          width:
-                                              120 +
-                                              (_pulseController.value * 24),
-                                          height:
-                                              120 +
-                                              (_pulseController.value * 24),
-                                          decoration: BoxDecoration(
-                                            color: errorRed.withValues(
-                                              alpha:
-                                                  0.25 *
-                                                  (1 - _pulseController.value),
-                                            ),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        // Lingkaran Progress Tahan 3 Detik
-                                        SizedBox(
-                                          width: 108,
-                                          height: 108,
-                                          child: CircularProgressIndicator(
-                                            value: _holdController.value,
-                                            strokeWidth: 4,
-                                            valueColor:
-                                                const AlwaysStoppedAnimation<
-                                                  Color
-                                                >(accentAmber),
-                                            backgroundColor: Colors.transparent,
-                                          ),
-                                        ),
-                                        // Tombol Merah Inti
-                                        Transform.scale(
-                                          scale: _isHoldingSos ? 0.94 : 1.0,
-                                          child: Container(
-                                            width: 96,
-                                            height: 96,
-                                            decoration: BoxDecoration(
-                                              color: errorRed,
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: errorRed.withValues(
-                                                    alpha: 0.45,
-                                                  ),
-                                                  blurRadius: 16,
-                                                  offset: const Offset(0, 6),
-                                                ),
-                                              ],
-                                            ),
-                                            child: const Center(
-                                              child: Text(
-                                                'SOS',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 26,
-                                                  fontWeight: FontWeight.w900,
-                                                  letterSpacing: 1.0,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              Text(
-                                _isHoldingSos
-                                    ? 'TAHAN TERUS... (${(3 - (_holdController.value * 3)).ceil()}s)'
-                                    : '(TAHAN 3 DETIK)',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFFE53935),
-                                  letterSpacing: 0.6,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Bottom Half - Network Status (Iridium Satellite)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          color: context.themeSurface,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: context.themePrimary.withValues(
-                                    alpha: 0.12,
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.satellite_alt_rounded,
-                                  color: context.themePrimary,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'STATUS JARINGAN',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: context.themeTextSecondary,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Iridium Satellite Alert Active',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: context.themeText,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Indikator Hijau Berdenyut
-                              AnimatedBuilder(
-                                animation: _pulseController,
-                                builder: (context, child) => Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF118833).withValues(
-                                      alpha:
-                                          0.4 + (_pulseController.value * 0.6),
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // =================================================================
                   // 3. PELACAK TEMAN LURING (OFFLINE PEER TRACKER BOX)
                   // Tap untuk membuka Detail Pelacak Teman Luring (Stitch Screen)
                   // =================================================================
@@ -1174,18 +718,29 @@ class _KeamananPageState extends State<KeamananPage>
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(6),
+                                padding: const EdgeInsets.all(7),
                                 decoration: BoxDecoration(
-                                  color: context.themeSurface,
-                                  borderRadius: BorderRadius.circular(8),
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF0284C7), Color(0xFF06B6D4)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF06B6D4).withValues(alpha: 0.35),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                                child: Icon(
+                                child: const Icon(
                                   Icons.group_rounded,
-                                  color: context.themePrimary,
+                                  color: Colors.white,
                                   size: 18,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   'Pelacak Teman Luring',
@@ -1193,6 +748,7 @@ class _KeamananPageState extends State<KeamananPage>
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.bold,
                                     color: context.themeText,
+                                    letterSpacing: -0.2,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1201,27 +757,36 @@ class _KeamananPageState extends State<KeamananPage>
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
+                                  horizontal: 8,
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: context.themeSurface,
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '2m lalu',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: context.themeTextSecondary,
-                                    fontWeight: FontWeight.w600,
+                                  border: Border.all(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                                    width: 1,
                                   ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '🟢 Siaga Aktif',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        color: Color(0xFF10B981),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 2),
                               Icon(
                                 Icons.chevron_right_rounded,
                                 color: context.themeTextSecondary,
-                                size: 18,
+                                size: 20,
                               ),
                             ],
                           ),
@@ -1322,168 +887,222 @@ class _KeamananPageState extends State<KeamananPage>
                   // 4. PROTOKOL & PANDUAN CARDS GRID
                   // =================================================================
                   // Card 1: Kebutuhan Wanita
-                  GestureDetector(
-                    onTap: _bukaHalamanKebutuhanWanita,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: context.themeCard,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: context.themeBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: isDark
-                                ? Colors.black.withValues(alpha: 0.2)
-                                : Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                  Container(
+                    decoration: BoxDecoration(
+                      color: context.themeCard,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFFFF4081).withValues(alpha: 0.25)
+                            : context.themeBorder,
+                        width: 0.9,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Kebutuhan Wanita',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: context.themeText,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Panduan Perawatan Menstruasi & Sanitasi',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: context.themeTextSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.3)
+                              : const Color(0xFFE91E63).withValues(alpha: 0.04),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _bukaHalamanKebutuhanWanita,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'LIHAT LANGKAH',
+                                      'Kebutuhan Wanita',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
-                                        color: context.themeTerracotta,
-                                        letterSpacing: 0.6,
+                                        color: context.themeText,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 10,
-                                      color: context.themeTerracotta,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Panduan Perawatan Menstruasi & Sanitasi',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: context.themeTextSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'LIHAT LANGKAH',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark
+                                                ? const Color(0xFFFF4081)
+                                                : const Color(0xFFE91E63),
+                                            letterSpacing: 0.6,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          size: 10,
+                                          color: isDark
+                                              ? const Color(0xFFFF4081)
+                                              : const Color(0xFFE91E63),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: context.themeTerracotta.withValues(
-                                alpha: 0.15,
                               ),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.female_rounded,
-                              color: context.themeTerracotta,
-                              size: 24,
-                            ),
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: isDark
+                                        ? const [Color(0xFFAD1457), Color(0xFFFF4081)]
+                                        : const [Color(0xFFC2185B), Color(0xFFFF4081)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFFF4081).withValues(alpha: 0.35),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.female_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
 
                   // Card 2: Protokol Kritis
-                  GestureDetector(
-                    onTap: _showProtokolKritisSheet,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: context.themeCard,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: context.themeBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: isDark
-                                ? Colors.black.withValues(alpha: 0.2)
-                                : Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                  Container(
+                    decoration: BoxDecoration(
+                      color: context.themeCard,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFFFFB300).withValues(alpha: 0.25)
+                            : context.themeBorder,
+                        width: 0.9,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Protokol Kritis',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: context.themeText,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Sanitasi Leave No Trace (LNT) & Evakuasi',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: context.themeTextSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.3)
+                              : const Color(0xFFF59E0B).withValues(alpha: 0.04),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _bukaHalamanProtokolKritis,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'PELAJARI',
+                                      'Protokol Kritis',
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
-                                        color: context.themePrimary,
-                                        letterSpacing: 0.6,
+                                        color: context.themeText,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 10,
-                                      color: context.themePrimary,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Sanitasi Leave No Trace (LNT) & Evakuasi',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: context.themeTextSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'PELAJARI',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark
+                                                ? const Color(0xFFFFB300)
+                                                : const Color(0xFFD97706),
+                                            letterSpacing: 0.6,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          size: 10,
+                                          color: isDark
+                                              ? const Color(0xFFFFB300)
+                                              : const Color(0xFFD97706),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: isDark
+                                        ? const [Color(0xFFE65100), Color(0xFFFFB300)]
+                                        : const [Color(0xFFD97706), Color(0xFFFBBF24)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFFFB300).withValues(alpha: 0.35),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.shield_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                            ],
                           ),
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: context.themePrimaryFixed,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.eco_rounded,
-                              color: context.themePrimary,
-                              size: 24,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -1497,128 +1116,4 @@ class _KeamananPageState extends State<KeamananPage>
     );
   }
 
-  Widget _buildSafetyFilterChips() {
-    final bool isDark = context.isDarkMode;
-
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _safetyFilterCategories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = _safetyFilterCategories[index];
-          final String name = cat['name'] as String;
-          final String label = cat['label'] as String;
-          final IconData icon = cat['icon'] as IconData;
-          final List<Color> gradient = cat['gradient'] as List<Color>;
-          final Color accentColor = cat['accentColor'] as Color;
-          final Color unselectedBg = cat['unselectedBg'] as Color;
-          final Color unselectedIcon = cat['unselectedIcon'] as Color;
-          final bool isSelected = _selectedSafetyFilter == name;
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedSafetyFilter = name;
-              });
-              if (name == 'Wanita') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const KebutuhanWanitaPage(),
-                  ),
-                );
-              } else if (name == 'Evakuasi') {
-                _showProtokolKritisSheet();
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? LinearGradient(
-                        colors: gradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isSelected
-                    ? null
-                    : (isDark
-                          ? context.themeSurface
-                          : unselectedBg.withValues(alpha: 0.85)),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isSelected
-                      ? accentColor.withValues(alpha: 0.7)
-                      : (isDark
-                            ? Colors.white.withValues(alpha: 0.12)
-                            : unselectedIcon.withValues(alpha: 0.3)),
-                  width: isSelected ? 1.5 : 1.0,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: gradient.last.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white.withValues(alpha: 0.25)
-                          : (isDark
-                                ? unselectedIcon.withValues(alpha: 0.25)
-                                : Colors.white),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 14,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? accentColor : unselectedIcon),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: isSelected
-                          ? FontWeight.w800
-                          : FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark
-                                ? context.themeText
-                                : const Color(0xFF1E293B)),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 }

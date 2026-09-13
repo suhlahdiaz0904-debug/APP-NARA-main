@@ -87,12 +87,25 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
       duration: const Duration(milliseconds: 600),
     )..forward();
 
-    // Haptic Getaran saat menerima sinyal darurat
+    // Haptic Getaran saat membuka layar
     HapticFeedback.heavyImpact();
   }
 
+  String _lastVibratedSosId = '';
+
+  /// Pola Getaran Darurat Keras untuk memberi tahu ada panggilan darurat SOS
+  void _triggerEmergencyVibrations() {
+    HapticFeedback.heavyImpact();
+    Timer(const Duration(milliseconds: 250), () => HapticFeedback.heavyImpact());
+    Timer(const Duration(milliseconds: 500), () => HapticFeedback.heavyImpact());
+    Timer(const Duration(milliseconds: 800), () => HapticFeedback.vibrate());
+    Timer(const Duration(milliseconds: 1200), () => HapticFeedback.vibrate());
+    Timer(const Duration(milliseconds: 1600), () => HapticFeedback.heavyImpact());
+    Timer(const Duration(milliseconds: 1900), () => HapticFeedback.heavyImpact());
+  }
+
   void _initFirebaseTrackingStreams() {
-    // 1. Listen Live Trackers dari Firestore
+    // 1. Listen Live Trackers dari Firestore (Mendeteksi semua HP/perangkat lain yang aktif)
     _liveTrackersSubscription = SafetyFirestoreService.instance
         .getLiveTrackersStream()
         .listen((trackers) {
@@ -110,6 +123,7 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
 
       if (otherAlerts.isNotEmpty) {
         final latestSos = otherAlerts.first;
+        final sosId = latestSos['id'] ?? '';
         final lat = (latestSos['latitude'] as num?)?.toDouble() ?? _activeSosLocation.latitude;
         final lon = (latestSos['longitude'] as num?)?.toDouble() ?? _activeSosLocation.longitude;
         final distMeters = Geolocator.distanceBetween(
@@ -119,11 +133,17 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
           lon,
         ).round();
 
+        // Getarkan HP jika ada sinyal darurat baru
+        if (_lastVibratedSosId != sosId) {
+          _lastVibratedSosId = sosId;
+          _triggerEmergencyVibrations();
+        }
+
         setState(() {
           _isUsingFirebaseSos = true;
           _hasSosDistress = true;
           _showIncomingNotification = true;
-          _activeSosAlertId = latestSos['id'] ?? '';
+          _activeSosAlertId = sosId;
           _sosVictimName = latestSos['userName'] ?? 'Rekan NARA';
           _sosVictimElevation = latestSos['altitude'] ?? '2,840 m';
           _sosVictimBattery = '${latestSos['battery'] ?? 18}%';
@@ -132,6 +152,11 @@ class _PelacakTemanPageState extends State<PelacakTemanPage>
           _sosTimeLabel = 'Live Firebase';
         });
         _bannerSlideController.forward(from: 0.0);
+
+        // Pindahkan kamera peta ke titik lokasi darurat
+        try {
+          _mapController.move(_activeSosLocation, 15.0);
+        } catch (_) {}
       } else if (_isUsingFirebaseSos) {
         setState(() {
           _isUsingFirebaseSos = false;

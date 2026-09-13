@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/features/gear/screens/gear_manager_screen.dart';
@@ -448,14 +447,27 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: context.themeSurfaceHigh,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: context.isDarkMode ? Colors.white12 : const Color(0xFFE0E5E0),
-          width: 0.8,
+        gradient: LinearGradient(
+          colors: context.isDarkMode
+              ? const [Color(0xFF14241C), Color(0xFF0E1A14)]
+              : const [Color(0xFFE8F5E9), Color(0xFFE0F2F1)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
         ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF4CAF78).withValues(alpha: context.isDarkMode ? 0.35 : 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4CAF78).withValues(alpha: context.isDarkMode ? 0.15 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -563,24 +575,29 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                         },
                       )
                     : null,
-                title: Text(
-                  'NARA',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: context.isDarkMode ? AppTheme.darkPrimary : const Color(0xFF143023),
-                  ),
+                title: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/images/logo.png',
+                      height: 32,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'NARA',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                        color: context.isDarkMode ? AppTheme.darkPrimary : const Color(0xFF143023),
+                      ),
+                    ),
+                  ],
                 ),
                 centerTitle: true,
-                flexibleSpace: ClipRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                    child: Container(
-                      color: context.themeBg.withValues(alpha: 0.75),
-                    ),
-                  ),
-                ),
                 actions: [
                   IconButton(
                     icon: Icon(
@@ -865,12 +882,24 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
-              color: isAllReady
-                  ? context.themePrimary
-                  : context.themeTerracotta,
+              gradient: LinearGradient(
+                colors: isAllReady
+                    ? const [Color(0xFF059669), Color(0xFF10B981)]
+                    : const [Color(0xFFEA580C), Color(0xFFF97316)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: (isAllReady ? const Color(0xFF10B981) : const Color(0xFFF97316))
+                      .withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -878,18 +907,18 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                 Icon(
                   isAllReady
                       ? Icons.verified_rounded
-                      : Icons.check_circle_rounded,
-                  color: isDark ? const Color(0xFF0F1713) : Colors.white,
+                      : Icons.pending_actions_rounded,
+                  color: Colors.white,
                   size: 16,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   '$readyCount/$totalCount\nSiap',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isDark ? const Color(0xFF0F1713) : Colors.white,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w900,
                     height: 1.1,
                   ),
                 ),
@@ -906,11 +935,11 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
                       ? 'Semua Perlengkapan Siap!'
                       : '${totalCount - readyCount} alat belum siap',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: isAllReady
-                        ? context.themePrimary
-                        : AppTheme.errorRed,
+                        ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                        : (isDark ? const Color(0xFFFB7185) : const Color(0xFFE11D48)),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -936,13 +965,23 @@ class _PeriksaGearPageState extends State<PeriksaGearPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.themePrimary,
-        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF0F382E), Color(0xFF0D2821)]
+              : const [Color(0xFF0D9488), Color(0xFF10B981)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF2DD4BF).withValues(alpha: isDark ? 0.3 : 0.4),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: context.themePrimary.withValues(alpha: 0.2),
+            color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.3 : 0.35),
             blurRadius: 16,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 5),
           ),
         ],
       ),

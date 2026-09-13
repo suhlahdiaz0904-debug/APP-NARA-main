@@ -669,18 +669,26 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // ==========================================
-  // 2. STATS GRID BENTO (3 KARTU)
+  // 2. STATS GRID BENTO (3 KARTU BERWARNA & INTERAKTIF)
   // ==========================================
   Widget _buildStatsGridBento({
     required String totalEkspedisi,
     required String jarak,
     required String jamTerbang,
   }) {
+    final bool isDark = context.isDarkMode;
+
     return Row(
       children: [
-        // Kartu 1: Ekspedisi
+        // Kartu 1: Ekspedisi (Emerald Theme)
         Expanded(
-          child: GestureDetector(
+          child: _buildBentoStatCard(
+            title: totalEkspedisi,
+            subtitle: 'EKSPEDISI',
+            icon: Icons.landscape_rounded,
+            gradient: isDark
+                ? const [Color(0xFF00796B), Color(0xFF00E676)]
+                : const [Color(0xFF1B5E20), Color(0xFF43A047)],
             onTap: () {
               Navigator.push(
                 context,
@@ -689,18 +697,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ).then((_) => _loadUserData());
             },
-            child: _buildBentoStatCard(
-              title: totalEkspedisi,
-              subtitle: 'EKSPEDISI',
-              isDark: false,
-            ),
           ),
         ),
         const SizedBox(width: 10),
 
-        // Kartu 2: Jarak Jelajah
+        // Kartu 2: Jarak Jelajah (Ocean Cyan Theme)
         Expanded(
-          child: GestureDetector(
+          child: _buildBentoStatCard(
+            title: jarak,
+            subtitle: 'JELAJAH',
+            icon: Icons.route_rounded,
+            gradient: isDark
+                ? const [Color(0xFF0091EA), Color(0xFF00E5FF)]
+                : const [Color(0xFF0277BD), Color(0xFF00B0FF)],
             onTap: () {
               Navigator.push(
                 context,
@@ -709,18 +718,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ).then((_) => _loadUserData());
             },
-            child: _buildBentoStatCard(
-              title: jarak,
-              subtitle: 'JELAJAH',
-              isDark: false,
-            ),
           ),
         ),
         const SizedBox(width: 10),
 
-        // Kartu 3: Jam Terbang
+        // Kartu 3: Jam Terbang (Sunset Amber Theme)
         Expanded(
-          child: GestureDetector(
+          child: _buildBentoStatCard(
+            title: jamTerbang,
+            subtitle: 'LAPANGAN',
+            icon: Icons.schedule_rounded,
+            gradient: isDark
+                ? const [Color(0xFFFF5722), Color(0xFFFFB300)]
+                : const [Color(0xFFE65100), Color(0xFFFF9800)],
             onTap: () {
               Navigator.push(
                 context,
@@ -729,12 +739,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ).then((_) => _loadUserData());
             },
-            child: _buildBentoStatCard(
-              title: jamTerbang,
-              subtitle: 'DI LAPANGAN',
-              isDark: true,
-              icon: Icons.timer_outlined,
-            ),
           ),
         ),
       ],
@@ -744,62 +748,85 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildBentoStatCard({
     required String title,
     required String subtitle,
-    required bool isDark,
-    IconData? icon,
+    required IconData icon,
+    required List<Color> gradient,
+    required VoidCallback onTap,
   }) {
-    final bool isDarkTheme = context.isDarkMode;
     return Container(
-      height: 96,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      height: 98,
       decoration: BoxDecoration(
-        color: isDark
-            ? (isDarkTheme ? const Color(0xFF273B32) : darkGreen)
-            : context.themeCard,
+        color: context.themeCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark ? Colors.transparent : context.themeBorder,
-          width: 0.8,
+          color: context.isDarkMode
+              ? gradient.last.withValues(alpha: 0.25)
+              : context.themeBorder,
+          width: 0.9,
         ),
         boxShadow: [
           BoxShadow(
-            color: isDark
-                ? (isDarkTheme ? Colors.black.withValues(alpha: 0.3) : darkGreen.withValues(alpha: 0.22))
-                : Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            color: context.isDarkMode
+                ? Colors.black.withValues(alpha: 0.28)
+                : gradient.first.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, color: secondaryGold, size: 18),
-            const SizedBox(height: 2),
-          ],
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark
-                  ? Colors.white
-                  : (isDarkTheme ? AppTheme.darkPrimary : darkGreen),
-              letterSpacing: -0.5,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: gradient.last.withValues(alpha: 0.35),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 14),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: context.themeText,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: context.themeTextSecondary,
+                    letterSpacing: 0.6,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-              color: isDark ? const Color(0xFFAACFB7) : context.themeTextSecondary,
-              letterSpacing: 0.6,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1217,14 +1244,21 @@ class _ProfilePageState extends State<ProfilePage> {
           width: 62,
           height: 62,
           decoration: BoxDecoration(
-            color: isUnlocked ? context.themeCard : context.themeSurfaceHigh,
+            color: isUnlocked
+                ? iconColor.withValues(alpha: context.isDarkMode ? 0.22 : 0.12)
+                : context.themeSurfaceHigh,
             shape: BoxShape.circle,
-            border: Border.all(color: context.themeBorder),
+            border: Border.all(
+              color: isUnlocked
+                  ? iconColor.withValues(alpha: 0.55)
+                  : context.themeBorder,
+              width: isUnlocked ? 1.8 : 1,
+            ),
             boxShadow: isUnlocked
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 10,
+                      color: iconColor.withValues(alpha: 0.35),
+                      blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
                   ]
@@ -1242,7 +1276,7 @@ class _ProfilePageState extends State<ProfilePage> {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 10.5,
-            fontWeight: FontWeight.w600,
+            fontWeight: isUnlocked ? FontWeight.bold : FontWeight.w500,
             color: isUnlocked ? context.themeText : context.themeTextSecondary,
             height: 1.2,
           ),
@@ -1282,6 +1316,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 0. Riwayat Log Ekspedisi
           _buildMenuItem(
             icon: Icons.explore_rounded,
+            gradient: const [Color(0xFF0284C7), Color(0xFF38BDF8)],
             title: 'Log Ekspedisi Saya',
             subtitle: 'Riwayat penjelajahan tebing, goa, dan catatan rute',
             onTap: () {
@@ -1298,6 +1333,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 0.5. Spot Favorit & Bookmark
           _buildMenuItem(
             icon: Icons.bookmarks_rounded,
+            gradient: const [Color(0xFFD97706), Color(0xFFFBBF24)],
             title: 'Spot Favorit & Bookmark Saya',
             subtitle: 'Daftar tebing dan goa favorit yang Anda simpan',
             onTap: () {
@@ -1315,6 +1351,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 1. Edit Profil & Setup Akun
           _buildMenuItem(
             icon: Icons.tune_rounded,
+            gradient: const [Color(0xFF059669), Color(0xFF34D399)],
             title: 'Edit Profil & Setup Akun',
             subtitle: 'Ubah role, bio, golongan darah, dan kontak darurat',
             onTap: _openSetupAkunPage,
@@ -1324,6 +1361,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 2. Ganti Foto dari Galeri HP
           _buildMenuItem(
             icon: Icons.photo_library_rounded,
+            gradient: const [Color(0xFF7C3AED), Color(0xFFA78BFA)],
             title: 'Ganti Foto Profil (Galeri HP)',
             subtitle: 'Pilih foto petualang langsung dari album galeri HP',
             onTap: _showImageSourcePicker,
@@ -1333,6 +1371,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 3. Panduan Perawatan Alat
           _buildMenuItem(
             icon: Icons.menu_book_rounded,
+            gradient: const [Color(0xFF0D9488), Color(0xFF2DD4BF)],
             title: 'Panduan Perawatan Alat',
             subtitle: 'SOP perawatan tali, descender, & gear caving',
             onTap: () {
@@ -1349,6 +1388,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 4. Pemeriksaan Gear
           _buildMenuItem(
             icon: Icons.handyman_rounded,
+            gradient: const [Color(0xFFEA580C), Color(0xFFFB923C)],
             title: 'Pemeriksaan Gear & Alat',
             subtitle: 'Verifikasi kesiapan perlengkapan ekspedisi',
             onTap: () {
@@ -1365,6 +1405,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 5. Pusat Keamanan
           _buildMenuItem(
             icon: Icons.gpp_good_rounded,
+            gradient: const [Color(0xFFE11D48), Color(0xFFFB7185)],
             title: 'Pusat Keamanan & SOS',
             subtitle: 'Pelacak teman luring & tombol sinyal darurat',
             onTap: () {
@@ -1381,6 +1422,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 6. Rincian Data Akun
           _buildMenuItem(
             icon: Icons.manage_accounts_rounded,
+            gradient: const [Color(0xFF4338CA), Color(0xFF6366F1)],
             title: 'Rincian Akun Terdaftar',
             subtitle: 'Lihat data identitas yang tersimpan di SQLite',
             onTap: () => _showAkunDetailDialog(
@@ -1399,6 +1441,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // 7. Kebijakan Privasi & Privasi Data
           _buildMenuItem(
             icon: Icons.shield_outlined,
+            gradient: const [Color(0xFF0891B2), Color(0xFF06B6D4)],
             title: 'Kebijakan Privasi & Data',
             subtitle: 'Informasi keamanan data GPS, medis, & izin perangkat',
             onTap: () {
@@ -1417,10 +1460,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildMenuItem({
     required IconData icon,
+    List<Color>? gradient,
     required String title,
     String? subtitle,
     required VoidCallback onTap,
   }) {
+    final List<Color> itemGrad = gradient ??
+        (context.isDarkMode
+            ? const [Color(0xFF1E3D2E), Color(0xFF2D5A43)]
+            : const [Color(0xFF2E7D32), Color(0xFF4CAF50)]);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
@@ -1432,12 +1481,23 @@ class _ProfilePageState extends State<ProfilePage> {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: (context.isDarkMode ? AppTheme.darkPrimary : darkGreen).withValues(alpha: 0.1),
+                gradient: LinearGradient(
+                  colors: itemGrad,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: itemGrad.first.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Icon(
                 icon,
-                color: context.isDarkMode ? AppTheme.darkPrimary : darkGreen,
+                color: Colors.white,
                 size: 19,
               ),
             ),

@@ -213,7 +213,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       child: Center(
         child: Image.asset(
           'assets/images/logo.png',
-          height: 85,
+          height: 115,
           fit: BoxFit.contain,
         ),
       ),

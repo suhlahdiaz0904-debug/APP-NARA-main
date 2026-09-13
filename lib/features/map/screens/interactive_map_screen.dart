@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -566,9 +565,27 @@ class _PetaInteraktifPageState extends State<PetaInteraktifPage>
   String _searchQuery = '';
   bool _showSearchResults = false;
 
-  // Pilihan Layer Map OpenStreetMap
+  // Pilihan Layer Map Google Maps & OpenStreetMap
   int _selectedLayerIndex = 0;
   final List<Map<String, String>> _mapLayers = [
+    {
+      'name': 'Google Maps Standard',
+      'url': 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+      'subdomain': '',
+      'desc': 'Peta jalan resmi Google Maps beresolusi tinggi dan akurat',
+    },
+    {
+      'name': 'Google Maps Satelit (Hybrid)',
+      'url': 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+      'subdomain': '',
+      'desc': 'Citra satelit resolusi tinggi foto bumi dengan label jalan',
+    },
+    {
+      'name': 'Google Maps Terrain',
+      'url': 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+      'subdomain': '',
+      'desc': 'Peta kontur topografi ketinggian & relief tebing alam Google',
+    },
     {
       'name': 'OpenStreetMap Standard',
       'url': 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -2090,26 +2107,17 @@ class _PetaInteraktifPageState extends State<PetaInteraktifPage>
               top: 0,
               left: 0,
               right: 0,
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                  child: Container(
-                    padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top + 6,
-                      bottom: 10,
-                      left: 16,
-                      right: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: bgCream.withValues(alpha: 0.92),
-                      border: Border(
-                        bottom: BorderSide(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    child: Column(
+              child: Container(
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 6,
+                  bottom: 10,
+                  left: 16,
+                  right: 16,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.transparent,
+                ),
+                child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
@@ -2268,8 +2276,6 @@ class _PetaInteraktifPageState extends State<PetaInteraktifPage>
                     ),
                   ),
                 ),
-              ),
-            ),
 
           // ===================================================================
           // 3. GOOGLE MAPS STYLE TOP NAVIGATION BANNER (JIKA NAVIGASI AKTIF)

@@ -344,7 +344,7 @@ class _Tugas12RegisterPageState extends State<Tugas12RegisterPage> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Image.asset('assets/images/logo.png', height: 90, fit: BoxFit.contain),
+        Image.asset('assets/images/logo.png', height: 120, fit: BoxFit.contain),
         const SizedBox(height: 8),
         Text(
           'Mulai petualangan luar ruang Anda bersama NARA',

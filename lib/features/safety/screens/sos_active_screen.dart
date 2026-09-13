@@ -42,6 +42,12 @@ class _SosAktifPageState extends State<SosAktifPage>
   late AnimationController _pulseController2;
   late AnimationController _pulseController3;
 
+  // Controller Animasi Interaktif Tap Tombol SOS
+  late AnimationController _sosTapController;
+  late Animation<double> _sosScaleAnimation;
+  int _sosPingCount = 1;
+  bool _isSosPinging = false;
+
   // Controller Batal Tahan
   late AnimationController _cancelHoldController;
   bool _isHoldingCancel = false;
@@ -97,6 +103,15 @@ class _SosAktifPageState extends State<SosAktifPage>
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) _pulseController3.repeat();
     });
+
+    // Animasi Interaktif Tap Tombol SOS (Spring scale bounce)
+    _sosTapController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+    _sosScaleAnimation = Tween<double>(begin: 1.0, end: 0.88).animate(
+      CurvedAnimation(parent: _sosTapController, curve: Curves.easeInOut),
+    );
 
     // Kontroller Tahan Batal 1.5 Detik
     _cancelHoldController = AnimationController(
@@ -202,8 +217,63 @@ class _SosAktifPageState extends State<SosAktifPage>
     _pulseController1.dispose();
     _pulseController2.dispose();
     _pulseController3.dispose();
+    _sosTapController.dispose();
     _cancelHoldController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSosButtonTap() async {
+    HapticFeedback.heavyImpact();
+    await _sosTapController.forward();
+    await _sosTapController.reverse();
+
+    setState(() {
+      _sosPingCount++;
+      _isSosPinging = true;
+    });
+
+    // Getarkan HP untuk konfirmasi transmisi
+    HapticFeedback.vibrate();
+
+    // Broadcast update GPS ping ke Firestore
+    if (_alertId.isNotEmpty) {
+      SafetyFirestoreService.instance.updateSosLocation(
+        _alertId,
+        latitude: _currentLat,
+        longitude: _currentLon,
+        altitude: _currentAltitudeText,
+      );
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.wifi_tethering_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '🚨 Sinyal SOS Ke-$_sosPingCount Terkirim! Getaran disiarkan ke tim terdekat.',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFD32F2F),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() => _isSosPinging = false);
+      }
+    });
   }
 
   void _startHoldingCancel() {
@@ -276,11 +346,11 @@ class _SosAktifPageState extends State<SosAktifPage>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // =======================================================
-                      // 1. CENTRAL ALERT TRIPLE PULSE
+                      // 1. CENTRAL ALERT TRIPLE PULSE & INTERACTIVE SOS BUTTON
                       // =======================================================
                       SizedBox(
-                        width: 200,
-                        height: 200,
+                        width: 220,
+                        height: 220,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
@@ -290,41 +360,97 @@ class _SosAktifPageState extends State<SosAktifPage>
                             _buildPulseCircle(_pulseController2),
                             // Pulse Layer 1
                             _buildPulseCircle(_pulseController1),
-                            // Central SOS Button
-                            Container(
-                              width: 128,
-                              height: 128,
-                              decoration: BoxDecoration(
-                                color: errorRed,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: errorContainer.withValues(alpha: 0.25),
-                                  width: 4,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: errorRed.withValues(alpha: 0.6),
-                                    blurRadius: 30,
-                                    offset: const Offset(0, 8),
+
+                            // Central Interactive SOS Button (Tekan untuk Broadcast Ping)
+                            AnimatedBuilder(
+                              animation: _sosTapController,
+                              builder: (context, child) {
+                                return Transform.scale(
+                                  scale: _sosScaleAnimation.value,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    shape: const CircleBorder(),
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      splashColor: Colors.white.withValues(alpha: 0.4),
+                                      highlightColor: Colors.redAccent.withValues(alpha: 0.3),
+                                      onTap: _handleSosButtonTap,
+                                      child: Ink(
+                                        width: 136,
+                                        height: 136,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: const RadialGradient(
+                                            colors: [
+                                              Color(0xFFFF5252),
+                                              Color(0xFFD32F2F),
+                                              Color(0xFF8B0000),
+                                            ],
+                                            center: Alignment(-0.2, -0.3),
+                                            radius: 0.85,
+                                          ),
+                                          border: Border.all(
+                                            color: _isSosPinging
+                                                ? Colors.white
+                                                : errorContainer.withValues(alpha: 0.4),
+                                            width: _isSosPinging ? 4.5 : 3.5,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: errorRed.withValues(
+                                                alpha: _isSosPinging ? 0.9 : 0.65,
+                                              ),
+                                              blurRadius: _isSosPinging ? 40 : 28,
+                                              spreadRadius: _isSosPinging ? 6 : 2,
+                                              offset: const Offset(0, 8),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                _isSosPinging
+                                                    ? Icons.wifi_tethering_rounded
+                                                    : Icons.emergency_rounded,
+                                                color: Colors.white,
+                                                size: 26,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              const Text(
+                                                'SOS',
+                                                style: TextStyle(
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.white,
+                                                  letterSpacing: 2.0,
+                                                ),
+                                              ),
+                                              Text(
+                                                _isSosPinging
+                                                    ? 'MEMANCARKAN...'
+                                                    : 'KETUK UNTUK PING',
+                                                style: TextStyle(
+                                                  fontSize: 8.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.white.withValues(alpha: 0.9),
+                                                  letterSpacing: 0.8,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ],
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  'SOS',
-                                  style: TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                              ),
+                                );
+                              },
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
 
                       // =======================================================
                       // 2. STATUS & INSTRUCTIONS

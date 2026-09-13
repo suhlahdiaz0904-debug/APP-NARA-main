@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +11,7 @@ import 'package:flutter_application_1/features/map/screens/interactive_map_scree
 import 'package:flutter_application_1/features/map/screens/spot_detail_screen.dart';
 import 'package:flutter_application_1/data/cave_data.dart';
 import 'package:flutter_application_1/features/gear/screens/gear_screen.dart';
+import 'package:flutter_application_1/features/gear/screens/gear_manager_screen.dart';
 import 'package:flutter_application_1/features/gear/screens/maintenance_guide_screen.dart';
 import 'package:flutter_application_1/features/safety/screens/safety_screen.dart';
 import 'package:flutter_application_1/features/profile/screens/profile_screen.dart';
@@ -22,6 +22,8 @@ import 'package:flutter_application_1/features/auth/models/user_model.dart';
 import 'package:flutter_application_1/features/news/screens/news_screen.dart';
 import 'package:flutter_application_1/features/news/models/news_model.dart';
 import 'package:flutter_application_1/features/news/screens/add_news_screen.dart';
+import 'package:flutter_application_1/features/gear/screens/clothing_recommendation_screen.dart';
+import 'package:flutter_application_1/features/splash/screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -382,7 +384,7 @@ class NaraApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeController.instance.themeMode,
-          home: const NaraHomePage(),
+          home: const SplashScreen(),
         );
       },
     );
@@ -398,6 +400,7 @@ class NaraHomePage extends StatefulWidget {
 
 class _NaraHomePageState extends State<NaraHomePage> {
   int _selectedNavIndex = 0;
+  late Future<WeatherModel> _weatherFuture;
   bool _isLoadingLocation = false;
 
   final List<Map<String, dynamic>> _expedisiList = [
@@ -560,7 +563,6 @@ class _NaraHomePageState extends State<NaraHomePage> {
   ];
 
   UserModel? _currentUser;
-
   List<Map<String, dynamic>> get _filteredExpeditions => _expedisiList;
 
   @override
@@ -569,6 +571,7 @@ class _NaraHomePageState extends State<NaraHomePage> {
     for (final c in KlapanunggalCavesData.caves) {
       _expedisiList.add(Map<String, dynamic>.from(c));
     }
+    _weatherFuture = WeatherService.fetchRealtimeWeather();
     _initDeviceLocationAndSort();
     _loadRegisteredUser();
   }
@@ -639,6 +642,9 @@ class _NaraHomePageState extends State<NaraHomePage> {
   }
 
   void _refreshWeather() {
+    setState(() {
+      _weatherFuture = WeatherService.fetchRealtimeWeather();
+    });
     _initDeviceLocationAndSort();
   }
 
@@ -705,6 +711,10 @@ class _NaraHomePageState extends State<NaraHomePage> {
   }
 
   Widget _buildHomeContent() {
+    final int readyGearCount = GearManager.readyCount;
+    final int totalGearCount = GearManager.totalCount;
+    final bool isAllGearReady = GearManager.isAllReady;
+
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
@@ -714,22 +724,29 @@ class _NaraHomePageState extends State<NaraHomePage> {
           elevation: 0,
           scrolledUnderElevation: 0,
           centerTitle: true,
-          flexibleSpace: ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(color: context.themeBg.withValues(alpha: 0.85)),
-            ),
-          ),
-          title: Text(
-            'NARA',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: context.isDarkMode
-                  ? AppTheme.darkPrimary
-                  : const Color(0xFF143023),
-            ),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/images/logo.png',
+                height: 34,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'NARA',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                  color: context.isDarkMode
+                      ? AppTheme.darkPrimary
+                      : const Color(0xFF143023),
+                ),
+              ),
+            ],
           ),
           actions: [
             // Quick Theme Mode Toggle Button
@@ -774,38 +791,477 @@ class _NaraHomePageState extends State<NaraHomePage> {
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
-              Text(
-                'LOREM IPSUM DOLOR IST LOR',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: context.themeTextSecondary,
-                  letterSpacing: 1.0,
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: context.isDarkMode
+                            ? [const Color(0xFF00796B), const Color(0xFF00E676)]
+                            : [const Color(0xFF1B5E20), const Color(0xFF43A047)],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.explore_rounded, color: Colors.white, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'PETUALANGAN ANDA DIMULAI',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               Text(
-                'HALO ${_currentUser != null ? _currentUser!.nama.toUpperCase() : "USER 123"}',
+                'Halo ${_currentUser?.nama ?? "Farhiyah"}! 👋',
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: 22,
                   fontWeight: FontWeight.w900,
                   color: context.themeText,
-                  letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
 
-              // 1. Widget Baris Tombol: CUACA & PETA OFFLINE
-              _buildWeatherAndMapRow(),
-              const SizedBox(height: 22),
+              _buildMainActionCard(),
+              const SizedBox(height: 12),
 
-              // 2. Widget Banner: RENCANAKAN (Dengan link Panduan Perawatan Peralatan)
-              _buildRencanakanBanner(),
+              // 1. Kartu Peta Offline (Tema Hijau Emerald)
+              _buildInfoCard(
+                icon: Icons.map_outlined,
+                title: 'Peta Offline Saya',
+                iconColor: Colors.white,
+                iconBgGradient: context.isDarkMode
+                    ? const [Color(0xFF00796B), Color(0xFF00E676)]
+                    : const [Color(0xFF1B5E20), Color(0xFF43A047)],
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PetaOfflinePage(),
+                    ),
+                  );
+                },
+                badge: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 14,
+                      color: context.isDarkMode
+                          ? const Color(0xFF00E676)
+                          : const Color(0xFF2E7D32),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'UNDUHAN SIAP',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: context.isDarkMode
+                            ? const Color(0xFF00E676)
+                            : const Color(0xFF2E7D32),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 2. Kartu Periksa Gear (Tema Sunset Amber/Orange)
+              _buildInfoCard(
+                icon: Icons.checklist_rounded,
+                title: 'Periksa Gear Kamu',
+                iconColor: Colors.white,
+                iconBgGradient: context.isDarkMode
+                    ? const [Color(0xFFFF5722), Color(0xFFFFB300)]
+                    : const [Color(0xFFE65100), Color(0xFFFF9800)],
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PeriksaGearPage(),
+                    ),
+                  );
+                  setState(() {});
+                },
+                badge: Row(
+                  children: [
+                    if (isAllGearReady) ...[
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 14,
+                        color: context.isDarkMode
+                            ? const Color(0xFF00E676)
+                            : const Color(0xFF2E7D32),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      '$readyGearCount/$totalGearCount SIAP',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isAllGearReady
+                            ? (context.isDarkMode
+                                ? const Color(0xFF00E676)
+                                : const Color(0xFF2E7D32))
+                            : (context.isDarkMode
+                                ? const Color(0xFFFF5252)
+                                : const Color(0xFFE53935)),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 3. Kartu Panduan Perawatan Alat (Tema Teal Karst)
+              _buildInfoCard(
+                icon: Icons.menu_book_rounded,
+                title: 'Panduan Perawatan Alat',
+                iconColor: Colors.white,
+                iconBgGradient: context.isDarkMode
+                    ? const [Color(0xFF00897B), Color(0xFF64FFDA)]
+                    : const [Color(0xFF00695C), Color(0xFF26A69A)],
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PanduanPerawatanPage(),
+                    ),
+                  );
+                  setState(() {});
+                },
+                badge: Row(
+                  children: [
+                    Icon(
+                      Icons.shield_rounded,
+                      size: 14,
+                      color: context.isDarkMode
+                          ? const Color(0xFF64FFDA)
+                          : const Color(0xFF00695C),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'GOA & TEBING',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: context.isDarkMode
+                            ? const Color(0xFF64FFDA)
+                            : const Color(0xFF00695C),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 4. Kartu Rekomendasi Pakaian (Tema Twilight Violet)
+              _buildInfoCard(
+                icon: Icons.checkroom_rounded,
+                title: 'Rekomendasi Pakaian',
+                iconColor: Colors.white,
+                iconBgGradient: context.isDarkMode
+                    ? const [Color(0xFF651FFF), Color(0xFFB388FF)]
+                    : const [Color(0xFF512DA8), Color(0xFF7C4DFF)],
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RekomendasiPakaianPage(),
+                    ),
+                  );
+                  setState(() {});
+                },
+                badge: Row(
+                  children: [
+                    Icon(
+                      Icons.wb_sunny_rounded,
+                      size: 14,
+                      color: context.isDarkMode
+                          ? const Color(0xFFB388FF)
+                          : const Color(0xFF512DA8),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'SESUAI CUACA & MEDAN',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: context.isDarkMode
+                            ? const Color(0xFFB388FF)
+                            : const Color(0xFF512DA8),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 28),
 
-              // 3. Section LAPORAN TERBARU (Dengan tombol + TAMBAH)
-              _buildLaporanTerbaruHeader(),
-              const SizedBox(height: 14),
+              // 3. Header Cuaca Real-Time
+              _buildSectionHeader(
+                title: 'PERKIRAAN CUACA REAL-TIME',
+                actionWidget: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const WeatherScreen(),
+                      ),
+                    ).then((_) => _refreshWeather());
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF143023),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 4. Baris Kartu Cuaca Real-Time Berbasis GPS
+              FutureBuilder<WeatherModel>(
+                future: _weatherFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Row(
+                      children: List.generate(
+                        3,
+                        (index) => Expanded(
+                          child: Container(
+                            height: 110,
+                            margin: EdgeInsets.only(
+                              right: index < 2 ? 12.0 : 0.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.themeSurface,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: context.themePrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (snapshot.hasError || !snapshot.hasData) {
+                    return GestureDetector(
+                      onTap: _refreshWeather,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: context.themeSurface,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.refresh,
+                              color: context.themeTerracotta,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Ketuk untuk memuat cuaca GPS',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: context.themeTerracotta,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  final weather = snapshot.data!;
+                  final displayHourly = weather.hourly.take(3).toList();
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const WeatherScreen(),
+                        ),
+                      ).then((_) => _refreshWeather());
+                    },
+                    child: Row(
+                      children: displayHourly.asMap().entries.map((entry) {
+                        final int idx = entry.key;
+                        final item = entry.value;
+
+                        final List<List<Color>> hourGradientsLight = [
+                          const [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                          const [Color(0xFFF0F9FF), Color(0xFFE0F2FE)],
+                          const [Color(0xFFFAF5FF), Color(0xFFF3E8FF)],
+                        ];
+                        final List<List<Color>> hourGradientsDark = [
+                          const [Color(0xFF231B10), Color(0xFF1B140B)],
+                          const [Color(0xFF0B2233), Color(0xFF091A27)],
+                          const [Color(0xFF1F1635), Color(0xFF161026)],
+                        ];
+                        final List<Color> borderColors = [
+                          const Color(0xFFF59E0B).withValues(alpha: context.isDarkMode ? 0.4 : 0.35),
+                          const Color(0xFF0284C7).withValues(alpha: context.isDarkMode ? 0.4 : 0.35),
+                          const Color(0xFF8B5CF6).withValues(alpha: context.isDarkMode ? 0.4 : 0.35),
+                        ];
+
+                        final cardGrad = context.isDarkMode
+                            ? hourGradientsDark[idx % 3]
+                            : hourGradientsLight[idx % 3];
+                        final borderCol = borderColors[idx % 3];
+
+                        return Expanded(
+                          child: Container(
+                            margin: EdgeInsets.only(
+                              right: idx < 2 ? 12.0 : 0.0,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: cardGrad,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: borderCol, width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: borderCol.withValues(alpha: context.isDarkMode ? 0.25 : 0.15),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  item['time'],
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: context.themeTextSecondary,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: (item['iconColor'] as Color).withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    item['icon'] as IconData,
+                                    color: item['iconColor'] as Color,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  item['temp'],
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: context.themeText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 28),
+
+              // 5. Section Laporan Terkini (Geser Horizontal)
+              _buildSectionHeader(
+                title: 'LAPORAN TERKINI',
+                actionWidget: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BuatBeritaAcaraPage(),
+                        ),
+                      );
+                      if (result != null) {
+                        setState(() {});
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: context.isDarkMode
+                            ? AppTheme.darkPrimary
+                            : const Color(0xFF143023),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: (context.isDarkMode
+                                    ? AppTheme.darkPrimary
+                                    : const Color(0xFF143023))
+                                .withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: context.isDarkMode
+                            ? const Color(0xFF0F1713)
+                            : Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               SizedBox(
                 height: 380,
                 child: ListView.builder(
@@ -865,357 +1321,160 @@ class _NaraHomePageState extends State<NaraHomePage> {
                   },
                 ),
               ),
-              const SizedBox(height: 28),
+            ]),
+          ),
+        ),
 
-              // 4. Section Ekspedisi Disarankan (Sinkronisasi Jarak Terdekat dari Lokasi Device)
-              _buildSectionHeader(
-                title: 'EKSPEDISI DISARANKAN',
-                actionWidget: GestureDetector(
-                  onTap: _initDeviceLocationAndSort,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF143023).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+        // 6. Section Ekspedisi Disarankan (Full-Width Green Background)
+        SliverToBoxAdapter(
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: context.isDarkMode
+                    ? const [
+                        Color(0xFF0F261B),
+                        Color(0xFF163E2D),
+                      ]
+                    : const [
+                        Color(0xFF143023),
+                        Color(0xFF1F4E3A),
+                      ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF143023).withValues(
+                    alpha: context.isDarkMode ? 0.35 : 0.15,
+                  ),
+                  blurRadius: 18,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
                       children: [
                         Icon(
-                          _isLoadingLocation
-                              ? Icons.sync
-                              : Icons.my_location_rounded,
-                          size: 13,
-                          color: const Color(0xFF143023),
+                          Icons.explore_rounded,
+                          color: Color(0xFFFED65B),
+                          size: 18,
                         ),
-                        const SizedBox(width: 4),
-                        const Text(
-                          'Lokasi Saya',
+                        SizedBox(width: 8),
+                        Text(
+                          'EKSPEDISI DISARANKAN',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF143023),
+                            color: Colors.white,
+                            letterSpacing: 0.8,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 320,
-                child: Builder(
-                  builder: (context) {
-                    final list = _filteredExpeditions;
-                    if (list.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'Tidak ada ekspedisi untuk kategori ini',
-                          style: TextStyle(
-                            color: context.themeTextSecondary,
-                            fontSize: 13,
+                    GestureDetector(
+                      onTap: _initDeviceLocationAndSort,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.22),
+                            width: 0.8,
                           ),
                         ),
-                      );
-                    }
-                    return ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: list.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(width: 14),
-                      itemBuilder: (context, index) {
-                        final exp = list[index];
-                        final double? dist = exp['distanceKm'] as double?;
-                        final String distText = dist != null
-                            ? (dist < 1.0
-                                  ? '${(dist * 1000).round()} m'
-                                  : '${dist.toStringAsFixed(1)} km')
-                            : 'Jarak GPS';
-                        final bool isNearest = index == 0 && dist != null;
-
-                        return _buildExpeditionCard(
-                          rating: exp['rating'] ?? '4.8',
-                          title: exp['title'],
-                          location: exp['location'],
-                          imageUrl: exp['imageUrl'],
-                          distanceText: distText,
-                          category: exp['type'],
-                          isNearest: isNearest,
-                          onTap: () => _bukaInformasiTempat(exp),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isLoadingLocation
+                                  ? Icons.sync
+                                  : Icons.my_location_rounded,
+                              size: 13,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Lokasi Saya',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 320,
+                  child: Builder(
+                    builder: (context) {
+                      final list = _filteredExpeditions;
+                      if (list.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'Tidak ada ekspedisi untuk kategori ini',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
                         );
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 100),
-            ]),
-          ),
-        ),
-      ],
-    );
-  }
+                      }
+                      return ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        physics: const ClampingScrollPhysics(),
+                        itemCount: list.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(width: 14),
+                        itemBuilder: (context, index) {
+                          final exp = list[index];
+                          final double? dist =
+                              exp['distanceKm'] as double?;
+                          final String distText = dist != null
+                              ? (dist < 1.0
+                                    ? '${(dist * 1000).round()} m'
+                                    : '${dist.toStringAsFixed(1)} km')
+                              : 'Jarak GPS';
+                          final bool isNearest =
+                              index == 0 && dist != null;
 
-  /// 1. Widget Baris Tombol CUACA & PETA OFFLINE (Sesuai Desain Stitch UI)
-  Widget _buildWeatherAndMapRow() {
-    final bool isDark = context.isDarkMode;
-    const Color darkNavy = Color(0xFF1B2042);
-
-    return Row(
-      children: [
-        // Tombol CUACA (Solid Dark Container)
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const WeatherScreen(),
-                  ),
-                ).then((_) => _refreshWeather());
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: Ink(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1B2338) : darkNavy,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isDark ? Colors.white24 : Colors.transparent,
-                    width: 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: darkNavy.withValues(alpha: 0.18),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFD6D7E3),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: const Icon(
-                        Icons.wb_sunny_rounded,
-                        color: darkNavy,
-                        size: 17,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'CUACA',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Tombol PETA OFFLINE (Outlined / Light Container)
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PetaOfflinePage(),
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: Ink(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: isDark ? context.themeSurface : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isDark ? Colors.white30 : darkNavy,
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF323B5A) : darkNavy,
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: const Icon(
-                        Icons.map_rounded,
-                        color: Colors.white,
-                        size: 17,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'PETA\nOFFLINE',
-                      style: TextStyle(
-                        color: isDark ? Colors.white : darkNavy,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 11,
-                        height: 1.1,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 2. Widget Banner RENCANAKAN dengan Panduan Perawatan Peralatan interaktif
-  Widget _buildRencanakanBanner() {
-    final bool isDark = context.isDarkMode;
-    final Color bannerBg =
-        isDark ? const Color(0xFF2C322F) : const Color(0xFFD6D6D6);
-    final Color textColor = isDark ? Colors.white : Colors.black;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 26),
-      decoration: BoxDecoration(
-        color: bannerBg,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'RENCANAKAN',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              color: textColor,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'JANGAN LUPA KESELAMATAN',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white70 : Colors.black87,
-              letterSpacing: 0.6,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PanduanPerawatanPage(),
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(4),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2.0),
-                child: Text(
-                  'PANDUAN PERAWATAN PERALATAN',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w900,
-                    color: isDark ? AppTheme.darkPrimary : Colors.black,
-                    decoration: TextDecoration.underline,
-                    decorationThickness: 1.5,
-                    letterSpacing: 0.5,
+                          return _buildExpeditionCard(
+                            rating: exp['rating'] ?? '4.8',
+                            title: exp['title'],
+                            location: exp['location'],
+                            imageUrl: exp['imageUrl'],
+                            distanceText: distText,
+                            category: exp['type'],
+                            isNearest: isNearest,
+                            onTap: () => _bukaInformasiTempat(exp),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 3. Header LAPORAN TERBARU dengan Tombol "+ TAMBAH"
-  Widget _buildLaporanTerbaruHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'LAPORAN TERBARU',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            color: context.themeText,
-            letterSpacing: 0.5,
-          ),
-        ),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BuatBeritaAcaraPage(),
-                ),
-              );
-              if (result != null) {
-                setState(() {});
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF264E36),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                '+ TAMBAH',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.5,
-                ),
-              ),
+                const SizedBox(height: 110),
+              ],
             ),
           ),
         ),
@@ -1233,9 +1492,14 @@ class _NaraHomePageState extends State<NaraHomePage> {
     required String summary,
     required VoidCallback onTap,
   }) {
-    final Color darkGreen = context.isDarkMode
-        ? AppTheme.darkPrimary
-        : const Color(0xFF143023);
+    final String upperTag = tag.toUpperCase();
+    final List<Color> tagGradient = upperTag.contains('WASPADA') || upperTag.contains('BAHAYA')
+        ? (context.isDarkMode ? const [Color(0xFFD32F2F), Color(0xFFFF5252)] : const [Color(0xFFC62828), Color(0xFFEF5350)])
+        : upperTag.contains('PANJAT') || upperTag.contains('CLIMB')
+            ? (context.isDarkMode ? const [Color(0xFFFF5722), Color(0xFFFFB300)] : const [Color(0xFFE65100), Color(0xFFFF9800)])
+            : upperTag.contains('GOA') || upperTag.contains('SPELEO')
+                ? (context.isDarkMode ? const [Color(0xFF651FFF), Color(0xFFB388FF)] : const [Color(0xFF512DA8), Color(0xFF7C4DFF)])
+                : (context.isDarkMode ? const [Color(0xFF00796B), Color(0xFF00E676)] : const [Color(0xFF1B5E20), Color(0xFF43A047)]);
 
     return Container(
       width: 290,
@@ -1243,13 +1507,18 @@ class _NaraHomePageState extends State<NaraHomePage> {
       decoration: BoxDecoration(
         color: context.themeCard,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.themeBorder, width: 0.8),
+        border: Border.all(
+          color: context.isDarkMode
+              ? context.themeBorder.withValues(alpha: 0.8)
+              : context.themeBorder,
+          width: 0.8,
+        ),
         boxShadow: [
           BoxShadow(
             color: context.isDarkMode
-                ? Colors.black.withValues(alpha: 0.2)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
+                ? Colors.black.withValues(alpha: 0.35)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
@@ -1262,20 +1531,29 @@ class _NaraHomePageState extends State<NaraHomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: darkGreen,
-                  borderRadius: BorderRadius.circular(6),
+                  gradient: LinearGradient(
+                    colors: tagGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: tagGradient.first.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Text(
                   tag,
-                  style: TextStyle(
-                    color: context.isDarkMode
-                        ? const Color(0xFF0F1713)
-                        : Colors.white,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.4,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
@@ -1284,6 +1562,7 @@ class _NaraHomePageState extends State<NaraHomePage> {
                 style: TextStyle(
                   color: context.themeTextSecondary,
                   fontSize: 11,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -1315,7 +1594,7 @@ class _NaraHomePageState extends State<NaraHomePage> {
               const Icon(
                 Icons.location_on_outlined,
                 size: 14,
-                color: Color(0xFFC48B27),
+                color: Color(0xFFF59E0B),
               ),
               const SizedBox(width: 4),
               Text(
@@ -1330,7 +1609,7 @@ class _NaraHomePageState extends State<NaraHomePage> {
               const Icon(
                 Icons.trending_up_rounded,
                 size: 15,
-                color: Color(0xFFC48B27),
+                color: Color(0xFFF59E0B),
               ),
               const SizedBox(width: 4),
               Text(
@@ -1359,27 +1638,38 @@ class _NaraHomePageState extends State<NaraHomePage> {
           SizedBox(
             width: double.infinity,
             height: 42,
-            child: ElevatedButton(
-              onPressed: onTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: darkGreen,
-                foregroundColor: context.isDarkMode
-                    ? const Color(0xFF0F1713)
-                    : Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: context.isDarkMode
+                      ? const [Color(0xFF2D6A4F), Color(0xFF1B4332)]
+                      : const [Color(0xFF1B4332), Color(0xFF2D6A4F)],
                 ),
-                elevation: 0,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2D6A4F).withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: Text(
-                'LIHAT DETAIL',
-                style: TextStyle(
-                  color: context.isDarkMode
-                      ? const Color(0xFF0F1713)
-                      : Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.8,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Center(
+                    child: Text(
+                      'LIHAT DETAIL',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1444,6 +1734,240 @@ class _NaraHomePageState extends State<NaraHomePage> {
         ),
       );
     }
+  }
+
+  Widget _buildMainActionCard() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: context.themeCard,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: context.isDarkMode
+              ? const Color(0xFF2D6A4F).withValues(alpha: 0.35)
+              : context.themeBorder,
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: context.isDarkMode
+                ? Colors.black.withValues(alpha: 0.3)
+                : const Color(0xFF143023).withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() => _selectedNavIndex = 2);
+          },
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -12,
+                  top: -12,
+                  child: Container(
+                    width: 130,
+                    height: 130,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E0D5),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: context.themeCard,
+                        width: 4,
+                      ),
+                      image: const DecorationImage(
+                        image: AssetImage('assets/images/sula.jpeg'),
+                        fit: BoxFit.cover,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: context.isDarkMode
+                              ? const [Color(0xFFFF5722), Color(0xFFFFB300)]
+                              : const [Color(0xFFE65100), Color(0xFFFF9800)],
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFE65100).withValues(alpha: 0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.explore_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Rencanakan Petualangan Baru',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: context.themeText,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          'Mulai rute ekspedisi Anda',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: context.themeTextSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: context.themePrimary,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required Widget badge,
+    Color? iconColor,
+    List<Color>? iconBgGradient,
+    VoidCallback? onTap,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: context.themeCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: context.isDarkMode
+              ? (iconBgGradient != null
+                  ? iconBgGradient.last.withValues(alpha: 0.25)
+                  : context.themeBorder)
+              : context.themeBorder,
+          width: 0.9,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: context.isDarkMode
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    gradient: iconBgGradient != null
+                        ? LinearGradient(
+                            colors: iconBgGradient,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: iconBgGradient == null
+                        ? context.themeTerracotta.withValues(alpha: 0.14)
+                        : null,
+                    shape: BoxShape.circle,
+                    boxShadow: iconBgGradient != null
+                        ? [
+                            BoxShadow(
+                              color: iconBgGradient.last.withValues(alpha: 0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: iconColor ?? Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          color: context.themeText,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      badge,
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconBgGradient != null
+                        ? iconBgGradient.first.withValues(alpha: 0.12)
+                        : context.themePrimary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: iconBgGradient != null
+                        ? iconBgGradient.first
+                        : context.themePrimary,
+                    size: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSectionHeader({required String title, Widget? actionWidget}) {
@@ -1605,53 +2129,95 @@ class _NaraHomePageState extends State<NaraHomePage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (category != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.25),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                category.toUpperCase(),
-                                style: const TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 0.4,
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: category.toLowerCase().contains('goa')
+                                          ? const [Color(0xFF0284C7), Color(0xFF06B6D4)]
+                                          : category.toLowerCase().contains('tebing')
+                                              ? const [Color(0xFFD97706), Color(0xFFF59E0B)]
+                                              : const [Color(0xFF059669), Color(0xFF10B981)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.2),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    category.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.4),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.white12, width: 0.8),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 12),
+                                      SizedBox(width: 2),
+                                      Text(
+                                        '4.8',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 5),
                           ],
                           Text(
                             title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 14,
+                              fontSize: 14.5,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
+                              letterSpacing: -0.2,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
                               const Icon(
-                                Icons.place_outlined,
-                                color: Colors.white70,
-                                size: 11,
+                                Icons.place_rounded,
+                                color: Color(0xFF38BDF8),
+                                size: 12,
                               ),
-                              const SizedBox(width: 2),
+                              const SizedBox(width: 3),
                               Expanded(
                                 child: Text(
                                   location,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontSize: 10.5,
+                                    fontSize: 11,
                                     color: Colors.white70,
                                   ),
                                 ),
@@ -1663,15 +2229,26 @@ class _NaraHomePageState extends State<NaraHomePage> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Color(0xFFFED65B),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: const Icon(
                         Icons.navigation_rounded,
                         color: Color(0xFF001D0F),
-                        size: 15,
+                        size: 16,
                       ),
                     ),
                   ],
@@ -1685,52 +2262,55 @@ class _NaraHomePageState extends State<NaraHomePage> {
   }
 
   Widget _buildBottomNavigationBar() {
-    return SizedBox(
-      height: 115,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomCenter,
-            children: [
-              Container(
-                height: 60,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: context.themeCard,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: context.themeBorder, width: 0.8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: context.isDarkMode
-                          ? Colors.black.withValues(alpha: 0.35)
-                          : const Color(0xFF0F3223).withValues(alpha: 0.06),
-                      blurRadius: 16,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+    final bool isDark = context.isDarkMode;
+
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 78,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          clipBehavior: Clip.none,
+          children: [
+            // Bar Background
+            Container(
+              height: 62,
+              margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
+              decoration: BoxDecoration(
+                color: context.themeCard.withValues(alpha: isDark ? 0.95 : 0.98),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : const Color(0xFF143023).withValues(alpha: 0.1),
+                  width: 1.0,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildNavItem(0, Icons.home_outlined, 'Beranda'),
-                    _buildNavItem(1, Icons.handyman_outlined, 'Alat'),
-                    const SizedBox(width: 48),
-                    _buildNavItem(
-                      3,
-                      Icons.health_and_safety_outlined,
-                      'Keamanan',
-                    ),
-                    _buildNavItem(4, Icons.person_outline, 'Profil'),
-                  ],
-                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                    blurRadius: 20,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              Positioned(top: 6, child: _buildCenterNavItem()),
-            ],
-          ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(0, Icons.home_rounded, 'Beranda'),
+                  _buildNavItem(1, Icons.handyman_rounded, 'Alat'),
+                  const Expanded(child: SizedBox()), // Ruang untuk tombol pop-up tengah
+                  _buildNavItem(3, Icons.health_and_safety_rounded, 'Keamanan'),
+                  _buildNavItem(4, Icons.person_rounded, 'Profil'),
+                ],
+              ),
+            ),
+            // Floating Pop-up Green Center Map Button
+            Positioned(
+              bottom: 14,
+              child: _buildCenterNavItem(),
+            ),
+          ],
         ),
       ),
     );
@@ -1738,39 +2318,50 @@ class _NaraHomePageState extends State<NaraHomePage> {
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final bool isSelected = _selectedNavIndex == index;
-    final Color activeColor = context.isDarkMode
-        ? AppTheme.darkPrimary
-        : const Color(0xFF0F3223);
+    final List<Color> tabActiveColors = [
+      context.isDarkMode ? const Color(0xFF00E676) : const Color(0xFF1B5E20), // Beranda: Emerald
+      context.isDarkMode ? const Color(0xFFFFB300) : const Color(0xFFE65100), // Alat: Amber Orange
+      context.isDarkMode ? const Color(0xFF00E5FF) : const Color(0xFF0288D1), // Peta
+      context.isDarkMode ? const Color(0xFFFF5252) : const Color(0xFFE53935), // Keamanan: Crimson Coral
+      context.isDarkMode ? const Color(0xFFB388FF) : const Color(0xFF512DA8), // Profil: Mountain Violet
+    ];
+
+    final Color activeColor = tabActiveColors[index % tabActiveColors.length];
     final Color inactiveColor = context.themeTextSecondary;
     final Color currentColor = isSelected ? activeColor : inactiveColor;
 
-    return GestureDetector(
-      onTap: () => setState(() => _selectedNavIndex = index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedScale(
-        scale: isSelected ? 1.1 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedNavIndex = index),
+        behavior: HitTestBehavior.opaque,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            TweenAnimationBuilder<Color?>(
-              tween: ColorTween(begin: inactiveColor, end: currentColor),
+            AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              builder: (context, color, child) {
-                return Icon(icon, color: color, size: 22);
-              },
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? activeColor.withValues(
+                        alpha: context.isDarkMode ? 0.22 : 0.12,
+                      )
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: currentColor, size: 21),
             ),
-            const SizedBox(height: 6),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
                 color: currentColor,
+                letterSpacing: 0.2,
               ),
-              child: Text(label),
             ),
           ],
         ),
@@ -1780,10 +2371,13 @@ class _NaraHomePageState extends State<NaraHomePage> {
 
   Widget _buildCenterNavItem() {
     final bool isSelected = _selectedNavIndex == 2;
-    final Color activeColor = context.isDarkMode
-        ? AppTheme.darkPrimary
-        : const Color(0xFF0F3223);
-    final Color inactiveColor = context.themeTextSecondary;
+    final bool isDark = context.isDarkMode;
+    final Color greenPrimary = isDark
+        ? const Color(0xFF2D6A4F)
+        : const Color(0xFF1B4332);
+    final Color greenAccent = isDark
+        ? const Color(0xFF52B788)
+        : const Color(0xFF2D6A4F);
 
     return GestureDetector(
       onTap: () => setState(() => _selectedNavIndex = 2),
@@ -1791,45 +2385,55 @@ class _NaraHomePageState extends State<NaraHomePage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AnimatedScale(
-            scale: isSelected ? 1.1 : 1.0,
-            duration: const Duration(milliseconds: 250),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
             curve: Curves.easeOutBack,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 100,
-              height: 52,
-              decoration: BoxDecoration(
-                color: activeColor,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: activeColor.withValues(
-                      alpha: isSelected ? 0.45 : 0.3,
-                    ),
-                    blurRadius: isSelected ? 14 : 10,
-                    offset: Offset(0, isSelected ? 6 : 4),
-                  ),
-                ],
+            width: isSelected ? 54 : 48,
+            height: isSelected ? 54 : 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: isSelected
+                    ? [greenAccent, greenPrimary]
+                    : [greenPrimary, const Color(0xFF143023)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              border: Border.all(
+                color: context.themeCard,
+                width: 3.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: greenPrimary.withValues(
+                    alpha: isSelected ? 0.55 : 0.35,
+                  ),
+                  blurRadius: isSelected ? 14 : 9,
+                  spreadRadius: isSelected ? 1 : 0,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
               child: Icon(
-                Icons.map_outlined,
-                color: context.isDarkMode
-                    ? const Color(0xFF0F1713)
-                    : Colors.white,
-                size: 24,
+                Icons.map_rounded,
+                color: Colors.white,
+                size: isSelected ? 26 : 22,
               ),
             ),
           ),
-          const SizedBox(height: 5),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 200),
+          const SizedBox(height: 2),
+          Text(
+            'Peta',
+            maxLines: 1,
             style: TextStyle(
               fontSize: 10,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? activeColor : inactiveColor,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              color: isSelected
+                  ? (isDark ? AppTheme.darkPrimary : const Color(0xFF143023))
+                  : context.themeTextSecondary,
+              letterSpacing: 0.2,
             ),
-            child: const Text('Peta'),
           ),
         ],
       ),

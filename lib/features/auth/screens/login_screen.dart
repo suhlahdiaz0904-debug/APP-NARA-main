@@ -325,7 +325,7 @@ class _Tugas12LoginPageState extends State<Tugas12LoginPage> {
       children: [
         Image.asset(
           'assets/images/logo.png',
-          height: 90,
+          height: 125,
           fit: BoxFit.contain,
         ),
         const SizedBox(height: 8),

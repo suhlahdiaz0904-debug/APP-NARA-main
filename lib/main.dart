@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_application_1/firebase_options.dart';
 import 'package:flutter_application_1/core/theme/theme_provider.dart';
 import 'package:flutter_application_1/core/services/firebase_database_seeder.dart';
-import 'package:flutter_application_1/features/home/screens/home_screen.dart';
+import 'package:flutter_application_1/features/splash/screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeController.instance.themeMode,
-          home: const NaraApp(),
+          home: const SplashScreen(),
         );
       },
     );

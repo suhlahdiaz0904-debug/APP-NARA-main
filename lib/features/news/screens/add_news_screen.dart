@@ -57,8 +57,11 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
   // Predefined destinations for geo-fencing check
   final List<Map<String, dynamic>> _predefinedSpots = [
     {"name": "Tebing Citatah 125", "region": "Padalarang, Bandung Barat", "lat": -6.84050, "lon": 107.45180},
+    {"name": "Tebing Parang", "region": "Purwakarta, Jawa Barat", "lat": -6.61200, "lon": 107.34800},
+    {"name": "Tebing Hawu", "region": "Padalarang, Bandung Barat", "lat": -6.83720, "lon": 107.44750},
     {"name": "Goa Cibeko", "region": "Klapanunggal, Bogor", "lat": -6.46966, "lon": 106.95931},
     {"name": "Goa Tugu Gula", "region": "Pasir Tjagak, Klapanunggal, Bogor", "lat": -6.46357, "lon": 106.95343},
+    {"name": "Goa Jomblang", "region": "Semanu, Gunungkidul, DIY", "lat": -8.02850, "lon": 110.63820},
     {"name": "Goa Cilalay", "region": "Klapanunggal, Bogor", "lat": -6.47015, "lon": 106.96171},
     {"name": "Goa Cisodong 1", "region": "Nambo, Klapanunggal, Bogor", "lat": -6.47970, "lon": 106.95592},
     {"name": "Goa Cibangkong", "region": "Nambo, Klapanunggal, Bogor", "lat": -6.48004, "lon": 106.95448},
@@ -570,6 +573,41 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF059669), Color(0xFF10B981)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.edit_note_rounded, color: Colors.white, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'KONTRIBUSI PETUALANG NARA',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     'Laporan Kegiatan Baru',
                     style: TextStyle(
@@ -581,14 +619,14 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Isi detail kegiatan alam bebas Anda dengan akurat.',
+                    'Isi detail kegiatan alam bebas Anda dengan akurat untuk dibagikan ke komunitas.',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       color: context.themeTextSecondary,
                       height: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Kartu Formulir
                   Container(
@@ -597,13 +635,18 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
                     decoration: BoxDecoration(
                       color: context.themeCard,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: context.themeBorder),
+                      border: Border.all(
+                        color: context.isDarkMode
+                            ? Colors.white12
+                            : const Color(0xFFE2E8F0),
+                        width: 1,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: isDark
-                              ? Colors.black.withValues(alpha: 0.2)
-                              : Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 10,
+                              ? Colors.black.withValues(alpha: 0.25)
+                              : Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 14,
                           offset: const Offset(0, 4),
                         ),
                       ],
@@ -616,6 +659,7 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
                         _buildTextField(
                           controller: _titleController,
                           hintText: 'Contoh: Penjelajahan Goa Jomblang',
+                          prefixIcon: Icons.title_rounded,
                           hasError: _titleError != null,
                           onChanged: (_) {
                             if (_titleError != null) {
@@ -632,32 +676,68 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
                         _buildLocationDropdown(),
                         if (_locationError != null)
                           _buildErrorMessage(_locationError!),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
 
-                        // GPS Simulation Toggle
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.gps_fixed, size: 16, color: Colors.blue),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Mode Simulasi GPS (Khusus Demo)',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.blue),
+                        // GPS Simulation Toggle (Rapih & Anti-Overflow)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0284C7).withValues(alpha: isDark ? 0.15 : 0.08),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFF0284C7).withValues(alpha: isDark ? 0.3 : 0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
                                 ),
-                              ],
-                            ),
-                            Switch(
-                              value: _isMockGps,
-                              activeThumbColor: Colors.blue,
-                              onChanged: (val) {
-                                setState(() {
-                                  _isMockGps = val;
-                                });
-                              },
-                            ),
-                          ],
+                                child: const Icon(Icons.gps_fixed_rounded, size: 14, color: Color(0xFF0284C7)),
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Mode Simulasi GPS',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0284C7),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'Bypass radius untuk pengujian/demo',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xFF0284C7),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch.adaptive(
+                                value: _isMockGps,
+                                activeThumbColor: const Color(0xFF0284C7),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _isMockGps = val;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 10),
 
@@ -785,12 +865,12 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
                           onTap: _isPicking ? null : () => _pickImage(ImageSource.camera),
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                             decoration: BoxDecoration(
                               color: context.themeSurface,
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(18),
                               border: Border.all(
-                                color: context.themeBorder,
+                                color: context.isDarkMode ? Colors.white12 : const Color(0xFFCBD5E1),
                                 width: 1.2,
                               ),
                             ),
@@ -798,46 +878,68 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Container(
-                                  width: 48,
-                                  height: 48,
+                                  width: 52,
+                                  height: 52,
                                   decoration: BoxDecoration(
-                                    color: context.themePrimaryFixed,
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF0D9488), Color(0xFF10B981)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
                                     shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
                                   ),
                                   child: _isPicking
-                                      ? Center(
+                                      ? const Center(
                                           child: SizedBox(
-                                            width: 20,
-                                            height: 20,
+                                            width: 22,
+                                            height: 22,
                                             child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: context.themePrimary,
+                                              strokeWidth: 2.2,
+                                              color: Colors.white,
                                             ),
                                           ),
                                         )
-                                      : Icon(
-                                          Icons.camera_alt_outlined,
-                                          color: context.themePrimary,
-                                          size: 24,
+                                      : const Icon(
+                                          Icons.photo_camera_rounded,
+                                          color: Colors.white,
+                                          size: 26,
                                         ),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 12),
                                 Text(
                                   'Ambil Foto Bukti Fisik via Kamera (Maks. 5)',
                                   style: TextStyle(
-                                    fontSize: 12.5,
-                                    color: context.themeTextSecondary,
-                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13,
+                                    color: context.themeText,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Pengambilan wajib langsung dari kamera HP sesuai kebijakan anti-hoaks NARA',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    color: Colors.redAccent,
-                                    fontWeight: FontWeight.w600,
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: Colors.red.withValues(alpha: 0.3),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Wajib langsung dari kamera HP sesuai SOP anti-hoaks NARA',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.redAccent,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -987,22 +1089,47 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: _submitReport,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: context.themePrimary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0D9488), Color(0xFF10B981)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      'Simpan & Publikasikan',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFF0F1713) : Colors.white,
+                    child: ElevatedButton(
+                      onPressed: _submitReport,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Simpan & Publikasikan',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1019,35 +1146,58 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
     switch (category) {
       case 'Goa':
         return {
-          'bg': isSelected ? context.themePrimaryFixed : context.themeSurface,
-          'border': isSelected ? context.themePrimary : context.themeBorder,
-          'text': isSelected ? context.themePrimary : context.themeText,
+          'bg': isSelected
+              ? const Color(0xFF0284C7)
+              : (context.isDarkMode ? const Color(0xFF0C2436) : const Color(0xFFF0F9FF)),
+          'border': isSelected
+              ? const Color(0xFF38BDF8)
+              : const Color(0xFF0284C7).withValues(alpha: 0.3),
+          'text': isSelected ? Colors.white : const Color(0xFF0284C7),
           'icon': Icons.terrain_rounded,
         };
       case 'Tebing':
         return {
           'bg': isSelected
-              ? context.themeTerracotta.withValues(alpha: 0.2)
-              : context.themeSurface,
-          'border': isSelected ? context.themeTerracotta : context.themeBorder,
-          'text': isSelected ? context.themeTerracotta : context.themeText,
+              ? const Color(0xFFEA580C)
+              : (context.isDarkMode ? const Color(0xFF331B0E) : const Color(0xFFFFF7ED)),
+          'border': isSelected
+              ? const Color(0xFFFB923C)
+              : const Color(0xFFEA580C).withValues(alpha: 0.3),
+          'text': isSelected ? Colors.white : const Color(0xFFEA580C),
           'icon': Icons.landscape_rounded,
         };
       case 'Jalur Baru':
         return {
           'bg': isSelected
-              ? context.themeGold.withValues(alpha: 0.2)
-              : context.themeSurface,
-          'border': isSelected ? context.themeGold : context.themeBorder,
-          'text': isSelected ? context.themeGold : context.themeText,
+              ? const Color(0xFFD97706)
+              : (context.isDarkMode ? const Color(0xFF332308) : const Color(0xFFFFFBEB)),
+          'border': isSelected
+              ? const Color(0xFFFBBF24)
+              : const Color(0xFFD97706).withValues(alpha: 0.3),
+          'text': isSelected ? Colors.white : const Color(0xFFD97706),
           'icon': Icons.explore_rounded,
+        };
+      case 'Gunung Hutan':
+        return {
+          'bg': isSelected
+              ? const Color(0xFF059669)
+              : (context.isDarkMode ? const Color(0xFF0D281E) : const Color(0xFFECFDF5)),
+          'border': isSelected
+              ? const Color(0xFF34D399)
+              : const Color(0xFF059669).withValues(alpha: 0.3),
+          'text': isSelected ? Colors.white : const Color(0xFF059669),
+          'icon': Icons.forest_rounded,
         };
       default:
         return {
-          'bg': isSelected ? context.themePrimaryFixed : context.themeSurface,
-          'border': isSelected ? context.themePrimary : context.themeBorder,
-          'text': isSelected ? context.themePrimary : context.themeText,
-          'icon': Icons.check,
+          'bg': isSelected
+              ? const Color(0xFF7C3AED)
+              : (context.isDarkMode ? const Color(0xFF1E1738) : const Color(0xFFFAF5FF)),
+          'border': isSelected
+              ? const Color(0xFFA78BFA)
+              : const Color(0xFF7C3AED).withValues(alpha: 0.3),
+          'text': isSelected ? Colors.white : const Color(0xFF7C3AED),
+          'icon': Icons.check_circle_rounded,
         };
     }
   }
@@ -1147,7 +1297,6 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
 
   Widget _buildLocationDropdown() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: context.themeSurface,
         borderRadius: BorderRadius.circular(14),
@@ -1158,6 +1307,7 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButtonFormField<Map<String, dynamic>>(
+          isExpanded: true,
           initialValue: _selectedSpot,
           hint: Text(
             'Pilih tebing/goa lokasi kegiatan...',
@@ -1165,17 +1315,96 @@ class _BuatBeritaAcaraPageState extends State<BuatBeritaAcaraPage> {
               color: context.themeTextSecondary.withValues(alpha: 0.6),
               fontSize: 13,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           decoration: const InputDecoration(
             border: InputBorder.none,
-            prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            prefixIcon: Icon(
+              Icons.location_on_rounded,
+              color: Color(0xFF0D9488),
+              size: 20,
+            ),
           ),
           dropdownColor: context.themeSurface,
           style: TextStyle(fontSize: 13.5, color: context.themeText),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: context.themeTextSecondary,
+          ),
+          selectedItemBuilder: (context) {
+            return _predefinedSpots.map((spot) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${spot["name"]} • ${spot["region"]}',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.themeText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList();
+          },
           items: _predefinedSpots.map((spot) {
+            final String name = spot["name"] as String;
+            final String region = spot["region"] as String;
+            final bool isGoa = name.toLowerCase().contains('goa');
+
             return DropdownMenuItem<Map<String, dynamic>>(
               value: spot,
-              child: Text('${spot["name"]} (${spot["region"]})'),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: (isGoa ? const Color(0xFF0284C7) : const Color(0xFFEA580C))
+                          .withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isGoa ? Icons.terrain_rounded : Icons.landscape_rounded,
+                      size: 14,
+                      color: isGoa ? const Color(0xFF0284C7) : const Color(0xFFEA580C),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: context.themeText,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          region,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: context.themeTextSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             );
           }).toList(),
           onChanged: (val) {
