@@ -92,6 +92,13 @@ class AppTheme {
   static const Color darkBorder = Color(0xFF214231); // Deep Earth Stone Border
 
   // Aksen Colorful & Vibrant Earth-Neon (Light & Dark Mode)
+  static const Color primaryGreen = Color(0xFF2E7D46);
+  static const Color primaryGreenDark = Color(0xFF3DAF68);
+  static const Color orangeAccent = Color(0xFFF4622A);
+  static const Color tealDark = Color(0xFF1B6B5C);
+  static const Color tealDarkBright = Color(0xFF2DAA8F);
+  static const Color expeditionDarkBg = Color(0xFF1A3C2A);
+
   static const Color vibrantEmerald = Color(0xFF2E7D32); // Vivid Emerald Green
   static const Color vibrantEmeraldDark = Color(0xFF00E676); // Neon Emerald
   
@@ -140,17 +147,18 @@ class AppTheme {
   static const List<Color> gradientAmberLight = [Color(0xFFD97706), Color(0xFFFBBF24)];
   static const List<Color> gradientAmberDark = [Color(0xFFF59E0B), Color(0xFFFFD54F)];
 
-  /// Tema Terang (Light Earth Tone Theme)
+  /// Tema Terang
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: lightBg,
-      primaryColor: lightPrimary,
+      primaryColor: primaryGreen,
       colorScheme: const ColorScheme.light(
-        primary: lightPrimary,
-        secondary: goldAccent,
-        surface: lightCard,
+        primary: primaryGreen,
+        secondary: orangeAccent,
+        tertiary: tealDark,
+        surface: Colors.white,
         surfaceContainer: lightSurface,
         surfaceContainerHigh: lightSurfaceHigh,
         onPrimary: Colors.white,
@@ -162,16 +170,17 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: lightPrimary),
+        iconTheme: IconThemeData(color: lightTextDark),
         titleTextStyle: TextStyle(
-          color: lightPrimary,
-          fontSize: 20,
+          color: lightTextDark,
+          fontSize: 22,
           fontWeight: FontWeight.w900,
           fontFamily: 'Inter',
+          letterSpacing: 1.5,
         ),
       ),
       cardTheme: CardThemeData(
-        color: lightCard,
+        color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
@@ -179,15 +188,12 @@ class AppTheme {
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: lightCard,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      dividerTheme: const DividerThemeData(
-        color: lightBorder,
-        thickness: 1,
-      ),
+      dividerTheme: const DividerThemeData(color: lightBorder, thickness: 1),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: lightCard,
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -196,16 +202,17 @@ class AppTheme {
     );
   }
 
-  /// Tema Gelap (Dark Midnight Forest Theme)
+  /// Tema Gelap
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBg,
-      primaryColor: darkPrimary,
+      primaryColor: primaryGreenDark,
       colorScheme: const ColorScheme.dark(
-        primary: darkPrimary,
-        secondary: goldAccentDark,
+        primary: primaryGreenDark,
+        secondary: orangeAccent,
+        tertiary: tealDarkBright,
         surface: darkCard,
         surfaceContainer: darkSurface,
         surfaceContainerHigh: darkSurfaceHigh,
@@ -218,12 +225,13 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: darkPrimary),
+        iconTheme: IconThemeData(color: darkTextLight),
         titleTextStyle: TextStyle(
           color: darkTextLight,
-          fontSize: 20,
+          fontSize: 22,
           fontWeight: FontWeight.w900,
           fontFamily: 'Inter',
+          letterSpacing: 1.5,
         ),
       ),
       cardTheme: CardThemeData(
@@ -238,10 +246,7 @@ class AppTheme {
         backgroundColor: darkCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      dividerTheme: const DividerThemeData(
-        color: darkBorder,
-        thickness: 1,
-      ),
+      dividerTheme: const DividerThemeData(color: darkBorder, thickness: 1),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: darkCard,
         surfaceTintColor: Colors.transparent,
@@ -263,11 +268,11 @@ extension ThemeContextExtension on BuildContext {
     return theme.brightness == Brightness.dark;
   }
 
-  Color get themeBg => isDarkMode ? AppTheme.darkBg : AppTheme.lightBg;
-  Color get themeCard => isDarkMode ? AppTheme.darkCard : AppTheme.lightCard;
+  Color get themeBg => isDarkMode ? AppTheme.darkBg : const Color(0xFFF0F4F1);
+  Color get themeCard => isDarkMode ? AppTheme.darkCard : Colors.white;
   Color get themeSurface => isDarkMode ? AppTheme.darkSurface : AppTheme.lightSurface;
   Color get themeSurfaceHigh => isDarkMode ? AppTheme.darkSurfaceHigh : AppTheme.lightSurfaceHigh;
-  Color get themePrimary => isDarkMode ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+  Color get themePrimary => isDarkMode ? AppTheme.primaryGreenDark : AppTheme.primaryGreen;
   Color get themePrimaryFixed => isDarkMode ? AppTheme.darkPrimaryFixed : AppTheme.lightPrimaryFixed;
   Color get themeText => isDarkMode ? AppTheme.darkTextLight : AppTheme.lightTextDark;
   Color get themeTextSecondary => isDarkMode ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
@@ -282,6 +287,7 @@ extension ThemeContextExtension on BuildContext {
   Color get themeError => isDarkMode ? AppTheme.errorRedDark : AppTheme.errorRed;
   Color get themeOlive => AppTheme.earthOlive;
   Color get themeBrown => AppTheme.earthBrown;
+  Color get themeOrange => AppTheme.orangeAccent;
 
   // Colorful Dynamic Gradients
   List<Color> get gradientEmerald => isDarkMode ? AppTheme.gradientEmeraldDark : AppTheme.gradientEmeraldLight;
@@ -292,3 +298,4 @@ extension ThemeContextExtension on BuildContext {
   List<Color> get gradientTeal => isDarkMode ? AppTheme.gradientTealDark : AppTheme.gradientTealLight;
   List<Color> get gradientAmber => isDarkMode ? AppTheme.gradientAmberDark : AppTheme.gradientAmberLight;
 }
+

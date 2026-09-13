@@ -66,10 +66,16 @@ class _KeamananPageState extends State<KeamananPage> {
 
   void _triggerEmergencyHapticAlert() {
     HapticFeedback.heavyImpact();
-    Timer(const Duration(milliseconds: 250), () => HapticFeedback.heavyImpact());
+    Timer(
+      const Duration(milliseconds: 250),
+      () => HapticFeedback.heavyImpact(),
+    );
     Timer(const Duration(milliseconds: 500), () => HapticFeedback.vibrate());
     Timer(const Duration(milliseconds: 900), () => HapticFeedback.vibrate());
-    Timer(const Duration(milliseconds: 1300), () => HapticFeedback.heavyImpact());
+    Timer(
+      const Duration(milliseconds: 1300),
+      () => HapticFeedback.heavyImpact(),
+    );
   }
 
   /// Inisialisasi pendengar Firebase Firestore untuk Sinyal Darurat SOS & Live Trackers
@@ -77,38 +83,46 @@ class _KeamananPageState extends State<KeamananPage> {
     _sosAlertsSubscription = SafetyFirestoreService.instance
         .getActiveSosAlertsStream()
         .listen((alerts) {
-      if (!mounted) return;
-      final currentUid = SafetyFirestoreService.instance.currentUserId;
-      // Filter alert dari user lain (bukan diri sendiri)
-      final otherAlerts = alerts.where((a) => a['userId'] != currentUid).toList();
+          if (!mounted) return;
+          final currentUid = SafetyFirestoreService.instance.currentUserId;
+          // Filter alert dari user lain (bukan diri sendiri)
+          final otherAlerts = alerts
+              .where((a) => a['userId'] != currentUid)
+              .toList();
 
-      if (otherAlerts.isNotEmpty) {
-        final latest = otherAlerts.first;
-        final alertId = latest['id'] ?? '';
-        if (_lastNotifiedSosId != alertId) {
-          _lastNotifiedSosId = alertId;
-          _triggerEmergencyHapticAlert();
-        }
-      }
+          if (otherAlerts.isNotEmpty) {
+            final latest = otherAlerts.first;
+            final alertId = latest['id'] ?? '';
+            if (_lastNotifiedSosId != alertId) {
+              _lastNotifiedSosId = alertId;
+              _triggerEmergencyHapticAlert();
+            }
+          }
 
-      setState(() {
-        _remoteSosAlerts
-          ..clear()
-          ..addAll(otherAlerts);
-      });
-    });
+          setState(() {
+            _remoteSosAlerts
+              ..clear()
+              ..addAll(otherAlerts);
+          });
+        });
 
     _liveTrackersSubscription = SafetyFirestoreService.instance
         .getLiveTrackersStream()
         .listen((trackers) {
-      if (!mounted) return;
-      _processLiveTrackers(trackers);
-    });
+          if (!mounted) return;
+          _processLiveTrackers(trackers);
+        });
   }
 
   void _processLiveTrackers(List<Map<String, dynamic>> trackers) {
     final currentUid = SafetyFirestoreService.instance.currentUserId;
-    final otherTrackers = trackers.where((t) => t['userId'] != currentUid && (t['latitude'] != 0.0 || t['longitude'] != 0.0)).toList();
+    final otherTrackers = trackers
+        .where(
+          (t) =>
+              t['userId'] != currentUid &&
+              (t['latitude'] != 0.0 || t['longitude'] != 0.0),
+        )
+        .toList();
 
     if (otherTrackers.isNotEmpty) {
       final List<Map<String, dynamic>> livePeers = [];
@@ -116,7 +130,12 @@ class _KeamananPageState extends State<KeamananPage> {
         final tracker = otherTrackers[i];
         final lat = tracker['latitude'] as double;
         final lon = tracker['longitude'] as double;
-        final distanceMeters = Geolocator.distanceBetween(_currentLat, _currentLon, lat, lon);
+        final distanceMeters = Geolocator.distanceBetween(
+          _currentLat,
+          _currentLon,
+          lat,
+          lon,
+        );
 
         final name = tracker['userName'] as String? ?? 'Petualang';
         final initials = name
@@ -135,15 +154,21 @@ class _KeamananPageState extends State<KeamananPage> {
           'initials': initials.isEmpty ? 'U' : initials,
           'name': name,
           'distance': distLabel,
-          'direction': tracker['status'] == 'sos' ? 'SOS AKTIF' : (distanceMeters < 500 ? 'Dekat' : 'Sekitar'),
+          'direction': tracker['status'] == 'sos'
+              ? 'SOS AKTIF'
+              : (distanceMeters < 500 ? 'Dekat' : 'Sekitar'),
           'battery': '${tracker['battery'] ?? 85}%',
           'elevation': tracker['altitude'] ?? '420 mdpl',
           'color': tracker['status'] == 'sos'
               ? errorRed
-              : (i % 2 == 0 ? const Color(0xFFFED65B) : const Color(0xFFC5ECD2)),
+              : (i % 2 == 0
+                    ? const Color(0xFFFED65B)
+                    : const Color(0xFFC5ECD2)),
           'textColor': tracker['status'] == 'sos'
               ? Colors.white
-              : (i % 2 == 0 ? const Color(0xFF574500) : const Color(0xFF002112)),
+              : (i % 2 == 0
+                    ? const Color(0xFF574500)
+                    : const Color(0xFF002112)),
           'lastSeen': 'Live Firebase',
           'status': tracker['status'] ?? 'normal',
         });
@@ -437,7 +462,10 @@ class _KeamananPageState extends State<KeamananPage> {
 
                   // Indikator Real-time Lokasi, Jam, dan Cuaca (Glassmorphism Pill)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isDark
@@ -453,7 +481,9 @@ class _KeamananPageState extends State<KeamananPage> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: context.themePrimary.withValues(alpha: isDark ? 0.2 : 0.08),
+                          color: context.themePrimary.withValues(
+                            alpha: isDark ? 0.2 : 0.08,
+                          ),
                           blurRadius: 10,
                           offset: const Offset(0, 2),
                         ),
@@ -470,7 +500,9 @@ class _KeamananPageState extends State<KeamananPage> {
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: context.themePrimary.withValues(alpha: 0.8),
+                                color: context.themePrimary.withValues(
+                                  alpha: 0.8,
+                                ),
                                 blurRadius: 6,
                                 spreadRadius: 1,
                               ),
@@ -533,7 +565,9 @@ class _KeamananPageState extends State<KeamananPage> {
                       borderRadius: BorderRadius.circular(22),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFD32F2F).withValues(alpha: 0.35),
+                          color: const Color(
+                            0xFFD32F2F,
+                          ).withValues(alpha: 0.35),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -618,10 +652,19 @@ class _KeamananPageState extends State<KeamananPage> {
                   if (_remoteSosAlerts.isNotEmpty) ...[
                     ..._remoteSosAlerts.map((alert) {
                       final victimName = alert['userName'] ?? 'Rekan Petualang';
-                      final alertLat = (alert['latitude'] as num?)?.toDouble() ?? 0.0;
-                      final alertLon = (alert['longitude'] as num?)?.toDouble() ?? 0.0;
-                      final distM = Geolocator.distanceBetween(_currentLat, _currentLon, alertLat, alertLon);
-                      final distText = distM < 1000 ? '${distM.round()} m' : '${(distM / 1000).toStringAsFixed(1)} km';
+                      final alertLat =
+                          (alert['latitude'] as num?)?.toDouble() ?? 0.0;
+                      final alertLon =
+                          (alert['longitude'] as num?)?.toDouble() ?? 0.0;
+                      final distM = Geolocator.distanceBetween(
+                        _currentLat,
+                        _currentLon,
+                        alertLat,
+                        alertLon,
+                      );
+                      final distText = distM < 1000
+                          ? '${distM.round()} m'
+                          : '${(distM / 1000).toStringAsFixed(1)} km';
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -646,7 +689,11 @@ class _KeamananPageState extends State<KeamananPage> {
                                 color: errorRed.withValues(alpha: 0.25),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.emergency_rounded, color: errorRed, size: 24),
+                              child: const Icon(
+                                Icons.emergency_rounded,
+                                color: errorRed,
+                                size: 24,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -677,12 +724,21 @@ class _KeamananPageState extends State<KeamananPage> {
                               onPressed: _bukaHalamanPelacakTeman,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: errorRed,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
                               child: const Text(
                                 'LACAK',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
                               ),
                             ),
                           ],
@@ -721,14 +777,19 @@ class _KeamananPageState extends State<KeamananPage> {
                                 padding: const EdgeInsets.all(7),
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
-                                    colors: [Color(0xFF0284C7), Color(0xFF06B6D4)],
+                                    colors: [
+                                      Color(0xFF0284C7),
+                                      Color(0xFF06B6D4),
+                                    ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(10),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF06B6D4).withValues(alpha: 0.35),
+                                      color: const Color(
+                                        0xFF06B6D4,
+                                      ).withValues(alpha: 0.35),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -761,10 +822,14 @@ class _KeamananPageState extends State<KeamananPage> {
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                  color: const Color(
+                                    0xFF10B981,
+                                  ).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                                    color: const Color(
+                                      0xFF10B981,
+                                    ).withValues(alpha: 0.4),
                                     width: 1,
                                   ),
                                 ),
@@ -969,15 +1034,23 @@ class _KeamananPageState extends State<KeamananPage> {
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: isDark
-                                        ? const [Color(0xFFAD1457), Color(0xFFFF4081)]
-                                        : const [Color(0xFFC2185B), Color(0xFFFF4081)],
+                                        ? const [
+                                            Color(0xFFAD1457),
+                                            Color(0xFFFF4081),
+                                          ]
+                                        : const [
+                                            Color(0xFFC2185B),
+                                            Color(0xFFFF4081),
+                                          ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFFF4081).withValues(alpha: 0.35),
+                                      color: const Color(
+                                        0xFFFF4081,
+                                      ).withValues(alpha: 0.35),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -1080,15 +1153,23 @@ class _KeamananPageState extends State<KeamananPage> {
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: isDark
-                                        ? const [Color(0xFFE65100), Color(0xFFFFB300)]
-                                        : const [Color(0xFFD97706), Color(0xFFFBBF24)],
+                                        ? const [
+                                            Color(0xFFE65100),
+                                            Color(0xFFFFB300),
+                                          ]
+                                        : const [
+                                            Color(0xFFD97706),
+                                            Color(0xFFFBBF24),
+                                          ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFFFB300).withValues(alpha: 0.35),
+                                      color: const Color(
+                                        0xFFFFB300,
+                                      ).withValues(alpha: 0.35),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -1115,5 +1196,4 @@ class _KeamananPageState extends State<KeamananPage> {
       ),
     );
   }
-
 }

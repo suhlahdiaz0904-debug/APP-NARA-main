@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -722,8 +723,12 @@ class _NaraHomePageState extends State<NaraHomePage> {
           pinned: true,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          scrolledUnderElevation: 0,
-          centerTitle: true,
+          flexibleSpace: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(color: context.themeBg.withValues(alpha: 0.85)),
+            ),
+          ),
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -755,9 +760,7 @@ class _NaraHomePageState extends State<NaraHomePage> {
                 ThemeController.instance.isDarkMode(context)
                     ? Icons.light_mode_rounded
                     : Icons.dark_mode_outlined,
-                color: context.isDarkMode
-                    ? AppTheme.goldAccent
-                    : const Color(0xFF143023),
+                color: context.themeTextSecondary,
                 size: 22,
               ),
               tooltip: ThemeController.instance.isDarkMode(context)
@@ -769,15 +772,13 @@ class _NaraHomePageState extends State<NaraHomePage> {
               onTap: () => setState(() => _selectedNavIndex = 4),
               child: Container(
                 margin: const EdgeInsets.only(right: 16),
-                width: 32,
-                height: 32,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: context.isDarkMode
-                        ? AppTheme.darkPrimary
-                        : const Color(0xFF001D0F),
-                    width: 1.5,
+                    color: context.themePrimary,
+                    width: 2,
                   ),
                 ),
                 child: ClipOval(
@@ -832,6 +833,7 @@ class _NaraHomePageState extends State<NaraHomePage> {
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   color: context.themeText,
+                  letterSpacing: 0.2,
                 ),
               ),
               const SizedBox(height: 16),
@@ -1482,6 +1484,8 @@ class _NaraHomePageState extends State<NaraHomePage> {
     );
   }
 
+
+
   Widget _buildExpandedNewsCard({
     required String tag,
     required String time,
@@ -1500,10 +1504,10 @@ class _NaraHomePageState extends State<NaraHomePage> {
             : upperTag.contains('GOA') || upperTag.contains('SPELEO')
                 ? (context.isDarkMode ? const [Color(0xFF651FFF), Color(0xFFB388FF)] : const [Color(0xFF512DA8), Color(0xFF7C4DFF)])
                 : (context.isDarkMode ? const [Color(0xFF00796B), Color(0xFF00E676)] : const [Color(0xFF1B5E20), Color(0xFF43A047)]);
+    final Color brandGreen = tagGradient.first;
 
     return Container(
-      width: 290,
-      padding: const EdgeInsets.all(16),
+      width: 295,
       decoration: BoxDecoration(
         color: context.themeCard,
         borderRadius: BorderRadius.circular(22),
@@ -1523,155 +1527,192 @@ class _NaraHomePageState extends State<NaraHomePage> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: tagGradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: tagGradient.first.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+          // Left accent indicator
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 5,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: tagGradient,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(22),
+                  bottomLeft: Radius.circular(22),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: tagGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        tag.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      time,
+                      style: TextStyle(
+                        color: context.themeTextSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
-                child: Text(
-                  tag,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: context.themeText,
+                    height: 1.25,
                   ),
                 ),
-              ),
-              Text(
-                time,
-                style: TextStyle(
-                  color: context.themeTextSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.bold,
-              color: context.themeText,
-              height: 1.25,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: SizedBox(
-              height: 115,
-              width: double.infinity,
-              child: _buildAdaptiveImage(imageUrl, height: 115),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 14,
-                color: Color(0xFFF59E0B),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                rockType,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: context.themeText,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Icon(
-                Icons.trending_up_rounded,
-                size: 15,
-                color: Color(0xFFF59E0B),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                grade,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: context.themeText,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            summary,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              fontStyle: FontStyle.italic,
-              color: context.themeTextSecondary,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 42,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: context.isDarkMode
-                      ? const [Color(0xFF2D6A4F), Color(0xFF1B4332)]
-                      : const [Color(0xFF1B4332), Color(0xFF2D6A4F)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF2D6A4F).withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    height: 115,
+                    width: double.infinity,
+                    child: _buildAdaptiveImage(imageUrl, height: 115),
                   ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(12),
-                  child: const Center(
-                    child: Text(
-                      'LIHAT DETAIL',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: context.isDarkMode ? const Color(0xFF332616) : const Color(0xFFFBF1DE),
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 13,
+                            color: Color(0xFFD97706),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            rockType,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: context.isDarkMode ? const Color(0xFF142B28) : const Color(0xFFE2F4EF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.trending_up_rounded,
+                            size: 14,
+                            color: Color(0xFF0D9488),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            grade,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F766E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  summary,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: context.themeTextSecondary,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: ElevatedButton(
+                    onPressed: onTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: brandGreen,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          'BACA SELENGKAPNYA',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
